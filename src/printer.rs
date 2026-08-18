@@ -41,6 +41,7 @@ use crate::util::lock;
 /// // tracing-subscriber 对「返回 writer 的闭包」有现成的 MakeWriter 实现
 /// init(move || printer.clone());
 /// ```
+#[derive(Default)]
 pub struct Printer {
     /// 控制台跑着时是 `Some`。由 [`Console::run`] 在起止两头拨。
     ///
@@ -109,15 +110,6 @@ impl Printer {
         let message = String::from_utf8_lossy(&self.pending).into_owned();
         self.pending.clear();
         self.emit(&message);
-    }
-}
-
-impl Default for Printer {
-    fn default() -> Self {
-        Self {
-            channel: Arc::default(),
-            pending: Vec::new(),
-        }
     }
 }
 
@@ -239,6 +231,10 @@ mod tests {
             receiver.try_recv().as_deref(),
             Ok("[12:00:00] [main/INFO]: 上游 503")
         );
+
+        // 长命的那个句柄照常能用。
+        printer.print("后面还有");
+        assert_eq!(receiver.try_recv().as_deref(), Ok("后面还有"));
     }
 
     /// flush 与 drop 等价，且 flush 过的内容不会再发一次。
@@ -253,6 +249,9 @@ mod tests {
 
         assert_eq!(receiver.try_recv().as_deref(), Ok("一条"));
         assert!(receiver.try_recv().is_err(), "drop 不该把它再发一遍");
+
+        printer.print("两条");
+        assert_eq!(receiver.try_recv().as_deref(), Ok("两条"));
     }
 
     /// 克隆共用通道，但不复制半行内容 —— 复制了会凭空多出一份。
@@ -268,6 +267,9 @@ mod tests {
 
         drop(writer);
         assert_eq!(receiver.try_recv().as_deref(), Ok("半行"));
+
+        printer.print("整行");
+        assert_eq!(receiver.try_recv().as_deref(), Ok("整行"));
     }
 
     /// 多线程写是常态 —— 后台任务、指令线程、日志线程各写各的。
