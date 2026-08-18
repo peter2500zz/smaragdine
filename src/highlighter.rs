@@ -22,8 +22,7 @@ use nu_ansi_term::Style;
 use reedline::{Highlighter, StyledText, Suggestion};
 
 use crate::{
-    Context, Source, Text,
-    inspect,
+    Context, Source, Text, inspect,
     interrupt::LineShadow,
     menu::MenuCursor,
     prompt::Aside,
@@ -201,7 +200,13 @@ fn styled_line<C: Context>(
             continue;
         }
         push(&mut styled, paint, Piece::Literal, 0, &line[at..start]);
-        push(&mut styled, paint, Piece::Argument, index, &line[start..end]);
+        push(
+            &mut styled,
+            paint,
+            Piece::Argument,
+            index,
+            &line[start..end],
+        );
         at = end;
     }
 
@@ -333,16 +338,13 @@ mod tests {
         use azalea_brigadier::prelude::*;
 
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
-        tree.register(
-            literal("add").then(
-                argument("a", integer()).then(
-                    argument("b", integer()).then(
-                        argument("c", integer())
-                            .executes(|_: &CommandContext<Source<Nothing>>| 1),
-                    ),
+        tree.register(literal("add").then(
+            argument("a", integer()).then(
+                argument("b", integer()).then(
+                    argument("c", integer()).executes(|_: &CommandContext<Source<Nothing>>| 1),
                 ),
             ),
-        );
+        ));
 
         let coloured: Vec<(String, Option<Color>)> =
             styled_line(&tree, &source(), &paint(), "add 1 2 3")
@@ -377,7 +379,10 @@ mod tests {
                 .map(|(style, text)| (text, style.foreground))
                 .collect();
 
-        assert!(coloured.contains(&("你好".to_owned(), Some(Color::Blue))), "{coloured:?}");
+        assert!(
+            coloured.contains(&("你好".to_owned(), Some(Color::Blue))),
+            "{coloured:?}"
+        );
     }
 
     /// 中文、emoji 都必须能安全切段，不能切在字符中间。
@@ -426,18 +431,17 @@ mod tests {
             &paint(),
         );
 
-        let (before, ghost): (String, String) =
-            styled
-                .buffer
-                .iter()
-                .fold((String::new(), String::new()), |(mut kept, mut ghost), (style, text)| {
-                    if style.foreground == colour(Piece::Ghost, 0) {
-                        ghost.push_str(text);
-                    } else {
-                        kept.push_str(text);
-                    }
-                    (kept, ghost)
-                });
+        let (before, ghost): (String, String) = styled.buffer.iter().fold(
+            (String::new(), String::new()),
+            |(mut kept, mut ghost), (style, text)| {
+                if style.foreground == colour(Piece::Ghost, 0) {
+                    ghost.push_str(text);
+                } else {
+                    kept.push_str(text);
+                }
+                (kept, ghost)
+            },
+        );
 
         assert_eq!(before, "echo ", "真实内容不该被改动");
         assert_eq!(ghost, "<message>");

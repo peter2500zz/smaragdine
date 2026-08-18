@@ -52,7 +52,8 @@ pub(crate) fn inspect<C: Context>(
         let context = parse.context.clone();
         let has_leftover = parse.reader.can_read();
 
-        let has_candidates = !crate::completer::suggest(dispatcher, source, line, cursor).is_empty();
+        let has_candidates =
+            !crate::completer::suggest(dispatcher, source, line, cursor).is_empty();
 
         // 占位只在「此刻无从下手」时才给：
         //
@@ -152,7 +153,10 @@ fn expected_at<C: Context>(
     let name = names.first()?.to_string();
 
     let node = parent.arguments.get(&name)?.read();
-    Some((name, node.description.clone().or_else(|| examples_of(&node))))
+    Some((
+        name,
+        node.description.clone().or_else(|| examples_of(&node)),
+    ))
 }
 
 /// 这个参数收什么形状的东西，用几个例子说明。

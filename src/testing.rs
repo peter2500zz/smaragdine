@@ -67,13 +67,10 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
                     .describe("打开详细日志")
                     .executes(|_: &CommandContext<Source<Nothing>>| 1),
             )
-            .then(
-                literal("level").describe("设定级别").then(
-                    // 没写说明的参数，说明退回 brigadier 的 examples()。
-                    argument("level", integer())
-                        .executes(|_: &CommandContext<Source<Nothing>>| 1),
-                ),
-            ),
+            .then(literal("level").describe("设定级别").then(
+                // 没写说明的参数，说明退回 brigadier 的 examples()。
+                argument("level", integer()).executes(|_: &CommandContext<Source<Nothing>>| 1),
+            )),
     );
 
     tree.register(

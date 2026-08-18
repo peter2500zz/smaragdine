@@ -101,11 +101,7 @@ pub(crate) fn suggest<C: Context>(
 /// 因为 Mojang 那边是给每个玩家下发过滤好的树，客户端根本看不到用不了的
 /// 指令。而控制台是一棵共享的树，`requires` 就是唯一的闸门 —— 不在这里滤，
 /// 同一条指令会同时有三种说法：菜单里有它、输进去标红、回车说不认识。
-fn usable<C: Context>(
-    parent: &CommandNode<Source<C>>,
-    source: &Source<C>,
-    value: &str,
-) -> bool {
+fn usable<C: Context>(parent: &CommandNode<Source<C>>, source: &Source<C>, value: &str) -> bool {
     // 字面量对得上，就问它自己。
     if let Some(node) = parent.literals.get(value) {
         return node.read().can_use(source);
@@ -114,7 +110,11 @@ fn usable<C: Context>(
     // 其余的值来自参数节点（bool 的 true/false、自定义候选提供者……）。
     // brigadier 没说是哪一个给的，所以只要还有一个用得了的参数子节点就放行
     // —— 一个都没有时，这些值无论如何也落不到实处。
-    parent.arguments.is_empty() || parent.arguments.values().any(|node| node.read().can_use(source))
+    parent.arguments.is_empty()
+        || parent
+            .arguments
+            .values()
+            .any(|node| node.read().can_use(source))
 }
 
 /// 把指令名恰好打全时的那一条候选补回来。
@@ -297,8 +297,21 @@ mod tests {
     #[test]
     fn the_menu_holds_only_insertable_candidates() {
         for line in [
-            "", "e", "ec", "echo", "echo ", "echo hi", "echo 你好", "zzz", "你好", "🎮", "quit",
-            "quit x", "pro", "proxy ", "log ",
+            "",
+            "e",
+            "ec",
+            "echo",
+            "echo ",
+            "echo hi",
+            "echo 你好",
+            "zzz",
+            "你好",
+            "🎮",
+            "quit",
+            "quit x",
+            "pro",
+            "proxy ",
+            "log ",
         ] {
             for suggestion in suggestions(line) {
                 assert!(!suggestion.value.is_empty(), "{line:?} 混进了纯展示条目");
@@ -357,4 +370,3 @@ mod tests {
         );
     }
 }
-

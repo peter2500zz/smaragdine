@@ -157,7 +157,9 @@ mod tests {
             .aside
             .set(Some(("<message> 要输出的内容".to_owned(), Piece::Hint)));
         assert!(
-            prompt.render_prompt_right().contains("<message> 要输出的内容"),
+            prompt
+                .render_prompt_right()
+                .contains("<message> 要输出的内容"),
             "{:?}",
             prompt.render_prompt_right()
         );
@@ -233,9 +235,10 @@ mod tests {
     #[test]
     fn the_console_takes_the_right_side_when_it_has_something_to_say() {
         let prompt = prompt(Some(Box::new(Mine)));
-        prompt
-            .aside
-            .set(Some(("Unknown or incomplete command".to_owned(), Piece::Failure)));
+        prompt.aside.set(Some((
+            "Unknown or incomplete command".to_owned(),
+            Piece::Failure,
+        )));
 
         assert!(
             prompt
