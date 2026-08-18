@@ -26,6 +26,11 @@ pub enum Piece {
     Failure,
     /// 输入行右侧那一句：此处该填什么。
     Hint,
+    /// 提示符的指示符（默认那个 `> `）。
+    ///
+    /// 只有颜色会被用到 —— reedline 的提示符接口收的是 `Color` 而不是
+    /// `Style`，粗体下划线之类到不了那里。
+    Prompt,
 }
 
 /// 交给着色闭包的一小段。
@@ -77,6 +82,7 @@ pub fn default_paint(token: &Token) -> Style {
         Piece::Argument => ARGUMENTS[token.index % ARGUMENTS.len()],
         Piece::Unparsed | Piece::Failure => Color::LightRed,
         Piece::Ghost | Piece::Hint => Color::DarkGray,
+        Piece::Prompt => Color::Green,
     };
     Style::new().fg(color)
 }
