@@ -1,0 +1,6 @@
+# 固定工具链，换机器时不必再想「clippy 装了没」。
+# 具体版本不钉死：MSRV 由 Cargo.toml 的 rust-version 声明，这里只保证
+# 组件齐全。
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

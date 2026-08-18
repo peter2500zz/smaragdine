@@ -1,0 +1,52 @@
+[package]
+name = "smaragdine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "把 brigadier 指令树变成一个带补全、语法高亮与历史的交互式控制台"
+license = "Apache-2.0"
+readme = false
+publish = false
+
+[dependencies]
+# ── 指令树 ──
+# 用 fork 而非 crates.io，两处改动都非它不可：
+# * 上游的 StringReader 把字符数当字节偏移用，任何非 ASCII 输入都会 panic
+#   （见 fix/utf8-cursor）；
+# * 字面量节点没处存说明，补全菜单只能另建一张按名字查的表 —— 于是全树的
+#   字面量名被迫唯一，`proxy on` 与 `log on` 不能共存。本分支给节点加了
+#   describe()，说明随 Suggestion 的 tooltip 一起流出来。
+azalea-brigadier = { git = "https://github.com/peter2500zz/azalea", branch = "smaragdine" }
+
+# ── 行编辑 ──
+# 同样用 fork：原版补全弹窗的 Tab 是「原地循环」——反复按 Tab 在同一位置换入
+# 下一条候选。而 reedline 只有一条采用候选的路径，写死在回车里，且采用完就
+# 停用菜单，循环无从谈起。fork 加了 ReedlineEvent::MenuAccept：采用但保留
+# 菜单，并对着算补全时的缓冲区套用，于是第二次采用是替换而非追加。
+reedline = { git = "https://github.com/peter2500zz/reedline", branch = "feat/menu-accept", default-features = false, features = [
+    "external_printer",
+] }
+# 版本对齐 reedline 的依赖（0.29），否则 Event 会是两个不同的类型。
+# 只用来在 EditMode 里辨认原始按键 —— reedline 仅重导出了 KeyCode 与 KeyModifiers。
+crossterm = "0.29"
+# ExternalPrinter 的通道是 crossbeam 的，接线时要拿着它的 Sender。
+crossbeam = { version = "0.8", default-features = false, features = ["std"] }
+nu-ansi-term = "0.50"
+
+# 注意：使用方不要设 panic = "abort" —— 控制台依赖 catch_unwind 兜住指令体与
+# 解析器的 panic，一条指令写崩了不该把整个程序带走。
+
+# 一行 unsafe 都没有；forbid 把「碰巧没有」变成编译器保证。
+[lints.rust]
+unsafe_code = "forbid"
+
+# 只挑当前零命中、纯属防将来的几条。clippy 默认已经开了 all 组，
+# 再写一遍 all = "warn" 是噪音；nursery 组误报多、收益低，不开。
+[lints.clippy]
+float_cmp = "warn"
+cast_possible_truncation = "warn"
+redundant_clone = "warn"
+# 模块布局用 foo.rs + foo/ 那一套，不要 foo/mod.rs（Rust 2018 起的推荐写法）。
+# 注意这两个 lint 的名字是反直觉的：想禁 mod.rs 用的是 mod_module_files，
+# self_named_module_files 恰好相反 —— 它强制你用 mod.rs。
+mod_module_files = "warn"
