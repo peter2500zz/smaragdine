@@ -32,6 +32,10 @@ crossterm = "0.29"
 # ExternalPrinter 的通道是 crossbeam 的，接线时要拿着它的 Sender。
 crossbeam = { version = "0.8", default-features = false, features = ["std"] }
 nu-ansi-term = "0.50"
+# brigadier 的公开 API 里就有 parking_lot 的 RwLock（`Arc<RwLock<CommandNode>>`），
+# 想给指令树里的节点起个名字就绕不开它。版本必须与 brigadier 用的那个大版本
+# 一致，否则会是两个互不相认的类型。
+parking_lot = "0.12"
 
 # 注意：使用方不要设 panic = "abort" —— 控制台依赖 catch_unwind 兜住指令体与
 # 解析器的 panic，一条指令写崩了不该把整个程序带走。

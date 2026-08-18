@@ -58,6 +58,7 @@
 //!   状态，见 [`Source::context`]。
 
 mod completer;
+mod help;
 mod highlighter;
 mod history;
 mod inspect;
@@ -82,6 +83,7 @@ use azalea_brigadier::{
 use nu_ansi_term::Style;
 use reedline::{EditMode, Emacs, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
 
+pub use help::{Help, Usage, help, usage};
 pub use printer::Printer;
 pub use source::{Context, Source};
 pub use text::Text;
@@ -96,7 +98,8 @@ pub use reedline;
 /// 常用的那些东西，外加 brigadier 的建树函数。
 pub mod prelude {
     pub use crate::{
-        Console, ConsoleBuilder, Context, Exit, Paint, Piece, Printer, Source, Text, Token,
+        Console, ConsoleBuilder, Context, Exit, Help, Paint, Piece, Printer, Source, Text, Token,
+        Usage,
     };
     pub use azalea_brigadier::prelude::*;
 }
@@ -397,8 +400,8 @@ impl<C: Context> ConsoleBuilder<C> {
     ///
     /// 说明写在节点上（`describe()`），补全菜单直接读它 —— 没有第二张表要
     /// 维护，同名子指令（`proxy on` 与 `log on`）也各说各的。
-    pub fn command(mut self, command: ArgumentBuilder<Source<C>, i32>) -> Self {
-        self.dispatcher.register(command);
+    pub fn command(mut self, command: impl Into<ArgumentBuilder<Source<C>, i32>>) -> Self {
+        self.dispatcher.register(command.into());
         self
     }
 

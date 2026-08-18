@@ -13,6 +13,7 @@
 //! * `danger` 一开始不在菜单里 —— `unlock` 之后才出现
 //! * 后台每三秒打一行，它落在提示行**上方**，不会搅乱你正在输入的内容
 //! * 空行上按 Ctrl-C，行尾浮出「再按一次退出」
+//! * `help` 列顶层，`help log` 往下看一层 —— 路径也能 Tab 补全
 
 use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -80,61 +81,58 @@ fn main() {
                     }),
             ),
         )
-        .command(
-            literal("status")
-                .describe("看看现在是什么状态")
-                .executes(|ctx: &CommandContext<Src>| {
-                    let app = ctx.source.context();
-                    ctx.source.printer().print(format!(
-                        "代理 {} / 详细日志 {} / {} / 后台已跑 {} 轮",
-                        onoff(app.proxy.load(Ordering::Relaxed)),
-                        onoff(app.verbose.load(Ordering::Relaxed)),
-                        if app.unlocked.load(Ordering::Relaxed) {
-                            "已解锁"
-                        } else {
-                            "已上锁"
-                        },
-                        app.ticks.load(Ordering::Relaxed),
-                    ));
-                    1
-                }),
-        )
+        .command(literal("status").describe("看看现在是什么状态").executes(
+            |ctx: &CommandContext<Src>| {
+                let app = ctx.source.context();
+                ctx.source.printer().print(format!(
+                    "代理 {} / 详细日志 {} / {} / 后台已跑 {} 轮",
+                    onoff(app.proxy.load(Ordering::Relaxed)),
+                    onoff(app.verbose.load(Ordering::Relaxed)),
+                    if app.unlocked.load(Ordering::Relaxed) {
+                        "已解锁"
+                    } else {
+                        "已上锁"
+                    },
+                    app.ticks.load(Ordering::Relaxed),
+                ));
+                1
+            },
+        ))
         // 两条指令下各有一个 `on` —— 说明挂在节点上，所以各说各的。
         .command(
             literal("proxy")
                 .describe("上游代理开关")
                 .then(switch("on", "启用上游代理", true, |app| &app.proxy))
-                .then(switch("off", "关掉上游代理，改为直连", false, |app| {
-                    &app.proxy
-                })),
+                .then(switch(
+                    "off",
+                    "关掉上游代理，改为直连",
+                    false,
+                    |app| &app.proxy,
+                )),
         )
         .command(
             literal("log")
                 .describe("日志开关")
                 .then(switch("on", "打开详细日志", true, |app| &app.verbose))
-                .then(switch("off", "只留要紧的日志", false, |app| &app.verbose))
+                .then(switch("off", "只留要紧的日志", false, |app| {
+                    &app.verbose
+                }))
                 // 没写说明的参数：右侧退回 brigadier 自带的例子。
-                .then(
-                    literal("level")
-                        .describe("设定级别")
-                        .then(argument("level", integer()).executes(
-                            |ctx: &CommandContext<Src>| {
-                                let level = get_integer(ctx, "level").unwrap_or(0);
-                                ctx.source.printer().print(format!("级别设为 {level}"));
-                                1
-                            },
-                        )),
-                ),
+                .then(literal("level").describe("设定级别").then(
+                    argument("level", integer()).executes(|ctx: &CommandContext<Src>| {
+                        let level = get_integer(ctx, "level").unwrap_or(0);
+                        ctx.source.printer().print(format!("级别设为 {level}"));
+                        1
+                    }),
+                )),
         )
-        .command(
-            literal("unlock")
-                .describe("解锁危险指令")
-                .executes(|ctx: &CommandContext<Src>| {
-                    ctx.source.context().unlocked.store(true, Ordering::Relaxed);
-                    ctx.source.printer().print("已解锁，danger 现在可用了");
-                    1
-                }),
-        )
+        .command(literal("unlock").describe("解锁危险指令").executes(
+            |ctx: &CommandContext<Src>| {
+                ctx.source.context().unlocked.store(true, Ordering::Relaxed);
+                ctx.source.printer().print("已解锁，danger 现在可用了");
+                1
+            },
+        ))
         .command(
             literal("lock")
                 .describe("锁回去")
@@ -162,7 +160,9 @@ fn main() {
             literal("slow")
                 .describe("跑三秒，期间照样能输入下一条")
                 .executes(|ctx: &CommandContext<Src>| {
-                    ctx.source.printer().print("开始…（试着现在就打下一条指令）");
+                    ctx.source
+                        .printer()
+                        .print("开始…（试着现在就打下一条指令）");
                     std::thread::sleep(Duration::from_secs(3));
                     ctx.source.printer().print("跑完了");
                     1
@@ -172,6 +172,13 @@ fn main() {
             literal("boom")
                 .describe("故意 panic —— 控制台会兜住它")
                 .executes(|_: &CommandContext<Src>| -> i32 { panic!("演示用的 panic") }),
+        )
+        // 帮助是个生成器：默认分层实现，名字、说明、排版、路径不认识时说
+        // 什么，都能换。不写这一行就没有 help。
+        .command(
+            smaragdine::help("help")
+                .describe("显示指令帮助；help <指令> 往下看一层")
+                .not_found("没有这条指令"),
         )
         .command(
             literal("stop")
@@ -206,7 +213,10 @@ fn main() {
             let app = source.context();
             let round = app.ticks.fetch_add(1, Ordering::Relaxed) + 1;
             if app.verbose.load(Ordering::Relaxed) {
-                printer.print(format!("[后台] 第 {round} 轮，代理 {}", onoff(app.proxy.load(Ordering::Relaxed))));
+                printer.print(format!(
+                    "[后台] 第 {round} 轮，代理 {}",
+                    onoff(app.proxy.load(Ordering::Relaxed))
+                ));
             }
         }
     });

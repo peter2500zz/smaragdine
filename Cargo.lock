@@ -20,7 +20,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "azalea-brigadier"
 version = "0.16.0+mc26.2"
-source = "git+https://github.com/peter2500zz/azalea?branch=smaragdine#deb1478212b58065b0d9f7e9228a88880d3ebace"
+source = "git+https://github.com/peter2500zz/azalea?branch=smaragdine#1478e919e2ba68c027b69e5dac439cb1cf1d6ea9"
 dependencies = [
  "parking_lot",
 ]
@@ -583,6 +583,7 @@ dependencies = [
  "crossbeam",
  "crossterm",
  "nu-ansi-term",
+ "parking_lot",
  "reedline",
 ]
 
