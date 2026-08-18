@@ -1,11 +1,14 @@
 //! 把 brigadier 指令树变成一个带补全、语法高亮与历史的交互式控制台。
 
+mod completer;
 mod history;
 mod interrupt;
 mod keys;
 mod menu;
 mod printer;
 mod source;
+#[cfg(test)]
+mod testing;
 mod text;
 mod theme;
 mod util;
