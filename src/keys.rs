@@ -14,8 +14,8 @@
 //!
 //! reedline 这边对应的位置只有 `EditMode::parse_event` —— 它是唯一能按当前
 //! 状态决定「这个键归谁」的地方。键位表做不到：`UntilFound` 里的 `MenuUp`
-//! 只在**没有激活菜单**时才让路（`engine.rs:1487` 的
-//! `active_menu().map_or(Inapplicable, ...)`），看的是 `is_active()` 而不是
+//! 只在**没有激活菜单**时才让路（`handle_editor_event` 的
+//! `MenuUp` 分支：`active_menu().map_or(Inapplicable, ...)`），看的是 `is_active()` 而不是
 //! 「画没画出来」，而我们的菜单在没有候选时正是活着但不画的。
 //!
 //! 把策略集中到这里，还顺带解决了另一件事：**菜单该在什么时候重新出现**。
@@ -104,7 +104,7 @@ impl ConsoleEditMode {
             (KeyCode::Up, KeyModifiers::NONE) => ReedlineEvent::PreviousHistory,
             (KeyCode::Down, KeyModifiers::NONE) => ReedlineEvent::NextHistory,
             // 弹窗关着时 Tab 把它打开。菜单已激活时这是空操作
-            // （`engine.rs:1423` 的 `if self.active_menu().is_none()`），
+            // （`handle_editor_event` 的 `Menu` 分支：`if self.active_menu().is_none()`），
             // 与「没有候选就没有弹窗」一致。
             (KeyCode::Tab, KeyModifiers::NONE) => {
                 // 新弹窗从「还没采用过」开始：循环状态随弹窗一起新建。
@@ -128,7 +128,7 @@ impl ConsoleEditMode {
             // 执行这一行。
             //
             // reedline 却把「回车 = 采用当前候选」写死在事件处理器里
-            // （`engine.rs:1575` 的 `Enter | Submit | SubmitOrNewline if
+            // （`handle_editor_event` 的 `Enter | Submit | SubmitOrNewline if
             // 有菜单激活`），键位绑定拦不住；而且它判的是 `is_active()`，我们
             // 那个不画出来的空菜单照样满足。于是先发一个 Esc 把菜单停掉，再让
             // 回车走它原本的提交路径。
@@ -142,14 +142,14 @@ impl ConsoleEditMode {
 
     /// 内容变了就让补全菜单跟上。
     ///
-    /// 菜单已经开着时，多发的这个 `Menu` 是空操作（`engine.rs:1423` 的
-    /// `if self.active_menu().is_none()`）；菜单被 Esc 关掉之后，它负责把菜单
+    /// 菜单已经开着时，多发的这个 `Menu` 是空操作（`handle_editor_event` 的
+    /// `Menu` 分支）；菜单被 Esc 关掉之后，它负责把菜单
     /// 请回来。
     ///
     /// **顺序是有讲究的**：`Menu` 排在编辑动作**前面** ——
     ///
     /// 先给许可，再由新内容拍板。reedline 这边的「拍板」就在编辑事件的处理
-    /// 里：改完之后若整行空了，它会把菜单停掉（`engine.rs:1691`）。把 `Menu`
+    /// 里：改完之后若整行空了，它会把菜单停掉（`handle_editor_event` 末尾那句 `line_buffer().get_buffer().is_empty()`）。把 `Menu`
     /// 放在后面，就等于在这个结论之后又强行把菜单请回来 —— 空行上于是常驻
     /// 一份列着全部指令的菜单，日志一滚就把屏幕挤满。
     fn refresh_menu(&mut self, event: ReedlineEvent) -> ReedlineEvent {
@@ -230,73 +230,21 @@ fn changes_buffer(event: &ReedlineEvent) -> bool {
 
 /// 一条编辑指令会不会改动内容。
 ///
-/// 列出来的是**不改内容**的那些，照抄 reedline 自己的分类
-/// （`enums.rs` 的 `EditCommand::edit_type()` 里归为 `MoveCursor` 与 `NoOp`
-/// 的全部分支）。之所以照抄而不是自己判断：那张表是库的权威说法，一条 grep
-/// 就能重新核对。之所以不直接调 `edit_type()`：它返回的 `EditType` 没有从
-/// crate 根导出（`mod enums;` 是私有模块），外部拿不到这个类型。
+/// 判据直接问 reedline 自己：`EditType` 里 `MoveCursor` 与 `NoOp` 不改内容，
+/// 其余（`EditText`、`UndoRedo`）都改。
 ///
-/// 其余一律算「改了」。`EditCommand` 标了 `#[non_exhaustive]`，将来新增的
-/// 分支会落到这里 —— 而这正是安全的一侧：多发一次开菜单事件顶多是空操作，
-/// 漏发一次却会让菜单该出来的时候不出来。
+/// 之所以拿代表值比而不是写 `matches!`：`EditType` 没有从 crate 根导出
+/// （`mod enums` 是私有模块），外部命不了名 —— 但它是 `PartialEq`，比较用不着
+/// 名字。这里早先手抄过整张分类表，抄出来的东西不会跟着库走：`EditCommand`
+/// 有一批分支挂在特性门后（reedline 的 `default = ["helix"]`），使用方的依赖图
+/// 里只要有谁开了默认特性，`SelectLine` 与 `CopySelectionSystem` 就会冒出来，
+/// 而手抄表里没有它们 —— 于是纯选中、纯复制会白白重开一次菜单。
 fn changes_line(command: &EditCommand) -> bool {
-    !matches!(
-        command,
-        // ── 纯移动光标 / 选区 ──
-        EditCommand::MoveToStart { .. }
-            | EditCommand::MoveToEnd { .. }
-            | EditCommand::MoveToLineStart { .. }
-            | EditCommand::MoveToLineEnd { .. }
-            | EditCommand::MoveToLineNonBlankStart { .. }
-            | EditCommand::MoveToPosition { .. }
-            | EditCommand::MoveLineUp { .. }
-            | EditCommand::MoveLineDown { .. }
-            | EditCommand::MoveLeft { .. }
-            | EditCommand::MoveRight { .. }
-            | EditCommand::MoveWordLeft { .. }
-            | EditCommand::MoveBigWordLeft { .. }
-            | EditCommand::MoveWordRight { .. }
-            | EditCommand::MoveWordRightStart { .. }
-            | EditCommand::MoveBigWordRightStart { .. }
-            | EditCommand::MoveWordRightEnd { .. }
-            | EditCommand::MoveBigWordRightEnd { .. }
-            | EditCommand::MoveRightUntil { .. }
-            | EditCommand::MoveRightBefore { .. }
-            | EditCommand::MoveLeftUntil { .. }
-            | EditCommand::MoveLeftBefore { .. }
-            | EditCommand::SwapCursorAndAnchor
-            | EditCommand::SelectAll
-            | EditCommand::Move(_)
-            | EditCommand::Extend(_)
-            | EditCommand::CollapseSelection(_)
-            | EditCommand::Select(_)
-            // ── 只往剪贴板里拷，不动行 ──
-            | EditCommand::CopySelection
-            | EditCommand::CopyFromStart
-            | EditCommand::CopyFromStartLinewise
-            | EditCommand::CopyFromLineStart
-            | EditCommand::CopyFromLineNonBlankStart
-            | EditCommand::CopyToEnd
-            | EditCommand::CopyToEndLinewise
-            | EditCommand::CopyToLineEnd
-            | EditCommand::CopyCurrentLine
-            | EditCommand::CopyWordLeft
-            | EditCommand::CopyBigWordLeft
-            | EditCommand::CopyWordRight
-            | EditCommand::CopyBigWordRight
-            | EditCommand::CopyWordRightToNext
-            | EditCommand::CopyBigWordRightToNext
-            | EditCommand::CopyLeft
-            | EditCommand::CopyRight
-            | EditCommand::CopyRightUntil(_)
-            | EditCommand::CopyRightBefore(_)
-            | EditCommand::CopyLeftUntil(_)
-            | EditCommand::CopyLeftBefore(_)
-            | EditCommand::CopyInsidePair { .. }
-            | EditCommand::CopyAroundPair { .. }
-            | EditCommand::CopyTextObject { .. }
-            | EditCommand::Copy { .. }
-    )
+    let kind = command.edit_type();
+
+    kind != EditCommand::MoveLeft { select: false }.edit_type()  // MoveCursor { select: false }
+        && kind != EditCommand::SelectAll.edit_type()            // MoveCursor { select: true }
+        && kind != EditCommand::CopySelection.edit_type() // NoOp
 }
 
 #[cfg(test)]

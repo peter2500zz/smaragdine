@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use azalea_brigadier::{
+    builder::argument_builder::ArgumentBuilderType,
     command_dispatcher::CommandDispatcher,
     context::{CommandContextBuilder, StringRange},
     string_reader::StringReader,
@@ -237,21 +238,32 @@ fn plain(line: &str) -> StyledText {
     styled
 }
 
-/// 各参数占据的区间，按起点排序。
+/// 各参数占据的区间，按解析顺序。
 ///
-/// 取最深一层子上下文的参数集合。Brigadier 原本靠有序 map 的插入序，而
-/// azalea 用的是 `HashMap`，迭代序不定，所以这里按区间起点排 —— 效果等同
-/// 且稳定（否则颜色会在重绘之间乱跳）。
+/// 走 `nodes` 而不是 `arguments`：前者是库按解析顺序推进去的一串「节点 +
+/// 区间」，后者是 `HashMap<String, ParsedArgument>`，两处会丢东西 ——
+///
+/// * 键是参数名，同一条链上两个同名参数，后者直接盖掉前者；
+/// * redirect 会另起一个子上下文，它的 `arguments` 从空开始，redirect 之前
+///   解析的参数留在父上下文里。
+///
+/// 丢掉的那一段会被当成字面量涂灰。顺序也不必自己排 —— 库推进去的就是解析
+/// 顺序，而上色要的正是这个。
 fn argument_ranges<C: Context>(
     context: &CommandContextBuilder<'_, Source<C>, i32>,
 ) -> Vec<StringRange> {
-    let mut deepest = context;
-    while let Some(child) = &deepest.child {
-        deepest = child;
+    let mut ranges = Vec::new();
+    let mut layer = Some(context);
+
+    while let Some(current) = layer {
+        for parsed in &current.nodes {
+            if matches!(parsed.node.read().value, ArgumentBuilderType::Argument(_)) {
+                ranges.push(parsed.range);
+            }
+        }
+        layer = current.child.as_deref();
     }
 
-    let mut ranges: Vec<StringRange> = deepest.arguments.values().map(|a| a.range).collect();
-    ranges.sort_by_key(StringRange::start);
     ranges
 }
 
@@ -382,6 +394,69 @@ mod tests {
         assert!(
             coloured.contains(&("你好".to_owned(), Some(Color::Blue))),
             "{coloured:?}"
+        );
+    }
+
+    fn spans_of(
+        tree: &CommandDispatcher<Source<Nothing>>,
+        line: &str,
+    ) -> Vec<(String, Option<Color>)> {
+        styled_line(tree, &source(), &paint(), line)
+            .buffer
+            .into_iter()
+            .filter(|(_, text)| !text.trim().is_empty())
+            .map(|(style, text)| (text, style.foreground))
+            .collect()
+    }
+
+    /// redirect 之前解析的参数也要算数。
+    ///
+    /// 早先取的是「最深一层子上下文的 arguments」，而 redirect 会另起一个子
+    /// 上下文、它的 arguments 从空开始 —— 于是 redirect 之前的参数被当字面量
+    /// 涂灰。redirect 正是 `ConsoleBuilder::commands()` 明说支持的用法。
+    #[test]
+    fn arguments_before_a_redirect_are_kept() {
+        use azalea_brigadier::prelude::*;
+
+        let run = |_: &CommandContext<Source<Nothing>>| 1;
+        let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
+        let target = tree.register(literal("target").then(argument("b", integer()).executes(run)));
+        tree.register(literal("hop").then(argument("a", integer()).redirect(target)));
+
+        assert_eq!(
+            spans_of(&tree, "hop 11 22"),
+            vec![
+                ("hop ".to_owned(), colour(Piece::Literal, 0)),
+                ("11".to_owned(), colour(Piece::Argument, 0)),
+                ("22".to_owned(), colour(Piece::Argument, 1)),
+            ]
+        );
+    }
+
+    /// 同一条链上两个同名参数，两个都要算数。
+    ///
+    /// `arguments` 是按名字作键的 HashMap，后者会盖掉前者。
+    #[test]
+    fn arguments_sharing_a_name_are_both_kept() {
+        use azalea_brigadier::prelude::*;
+
+        let run = |_: &CommandContext<Source<Nothing>>| 1;
+        let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
+        tree.register(
+            literal("pair").then(
+                argument("x", integer())
+                    .then(literal("and").then(argument("x", integer()).executes(run))),
+            ),
+        );
+
+        assert_eq!(
+            spans_of(&tree, "pair 11 and 22"),
+            vec![
+                ("pair ".to_owned(), colour(Piece::Literal, 0)),
+                ("11".to_owned(), colour(Piece::Argument, 0)),
+                (" and ".to_owned(), colour(Piece::Literal, 0)),
+                ("22".to_owned(), colour(Piece::Argument, 1)),
+            ]
         );
     }
 

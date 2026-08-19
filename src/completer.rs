@@ -64,16 +64,14 @@ pub(crate) fn suggest<C: Context>(
                         description: suggestion.tooltip.clone(),
                         span: Span::new(suggestion.range.start(), suggestion.range.end()),
                         value: suggestion.text(),
-                        style: None,
-                        extra: None,
                         // 不补空格：采用候选只该做区间替换、不追加任何东西。
                         // 补了反而会把指令打废 —— brigadier 下探子节点前要求
                         // 至少还剩两个字符（分隔符 + 下一 token 的首字符，见
                         // command_dispatcher.rs 的 can_read_length(2)），只剩
                         // 一个尾随空格时这一步不成立，"stop " 便解析失败。
+                        // 默认就是 false，写出来是因为这件事要紧。
                         append_whitespace: false,
-                        display_override: None,
-                        match_indices: None,
+                        ..Default::default()
                     }
                 })
                 .collect();
@@ -153,12 +151,9 @@ fn exact_literal_match<C: Context>(
         description,
         span: Span::new(start, pos),
         value: typed.to_owned(),
-        style: None,
-        extra: None,
         // 与上面同理：补空格会让 "stop " 这类整行解析失败。
         append_whitespace: false,
-        display_override: None,
-        match_indices: None,
+        ..Default::default()
     })
 }
 

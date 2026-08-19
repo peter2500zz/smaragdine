@@ -146,15 +146,18 @@ fn expected_at<C: Context>(
     let at_cursor = context.find_suggestion_context(cursor);
     let parent = at_cursor.parent.read();
 
-    // 同一节点下多个参数时取字典序第一个，保证重绘之间稳定
-    // （azalea 用的是 HashMap，迭代序不定）。
-    let mut names: Vec<&String> = parent.arguments.keys().collect();
-    names.sort();
-    let name = names.first()?.to_string();
+    // 同一节点下多个参数时取字典序第一个，保证重绘之间稳定。`children` 正是
+    // 按名字排好的（brigadier 那边的原话：children need to be ordered when
+    // getting command suggestions），遍历它就行 —— `arguments` 是 HashMap，
+    // 迭代序不定，得先收集再排序。
+    let node = parent
+        .children
+        .values()
+        .find(|child| matches!(child.read().value, ArgumentBuilderType::Argument(_)))?
+        .read();
 
-    let node = parent.arguments.get(&name)?.read();
     Some((
-        name,
+        node.name().to_owned(),
         node.description.clone().or_else(|| examples_of(&node)),
     ))
 }

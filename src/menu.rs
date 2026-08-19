@@ -258,6 +258,16 @@ impl Menu for HidingMenu {
         self.inner.replace_in_buffer_in_place(editor);
     }
 
+    /// 同样必须显式转发。
+    ///
+    /// 与上面那条同理：trait 上带默认实现（返回 `None`），漏掉不会报错。区别
+    /// 在于后果——引擎自己不调它（fork 里只有测试调），所以今天漏了也看不
+    /// 出来。它是留给「想预览选中项」的调用方的，而这个包装的全部意义就是
+    /// 「除了不画，其余原样」。
+    fn selected_value(&self) -> Option<Suggestion> {
+        self.inner.selected_value()
+    }
+
     fn menu_required_lines(&self, terminal_columns: u16) -> u16 {
         self.inner.menu_required_lines(terminal_columns)
     }
