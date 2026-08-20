@@ -9,6 +9,7 @@
 //! | ↑ / ↓ | 上下移动选中项 | 翻历史 |
 //! | Tab | 采用选中项，再按则原地换下一条 | 打开弹窗 |
 //! | Shift+Tab | 同上，反向 | 无 |
+//! | 光标移动 | 收起弹窗，再按编辑模式原义移动 | 按编辑模式原义移动 |
 //! | Esc | 收起弹窗 | 清除选区 |
 //! | Enter | 执行本行 | 执行本行 |
 //!
@@ -71,7 +72,9 @@ impl ConsoleEditMode {
     ///
     /// 返回 `None` 表示这个键弹窗不要，交给下一层。
     fn route(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Option<ReedlineEvent> {
-        let visible = self.menu_visible.get();
+        // 一批原始按键会先全部经过 parse_event，再由引擎逐条执行。Esc 已经
+        // 在本地记成 dismissed 时，不能继续相信菜单上一帧发布的 visible。
+        let visible = self.menu_visible.get() && !self.cursor.is_dismissed();
 
         Some(match (code, modifiers) {
             // ── 弹窗可见时独占的键 ──
@@ -101,8 +104,8 @@ impl ConsoleEditMode {
             // 历史走位交给 reedline 自己的 PreviousHistory/NextHistory。它默认
             // 是前缀搜索，不是我们要的纯索引走位 —— 那件事在 history 模块里从
             // 源头解决了，这里不必也不该再打补丁。
-            (KeyCode::Up, KeyModifiers::NONE) => ReedlineEvent::PreviousHistory,
-            (KeyCode::Down, KeyModifiers::NONE) => ReedlineEvent::NextHistory,
+            (KeyCode::Up, KeyModifiers::NONE) => self.dismiss_then(ReedlineEvent::PreviousHistory),
+            (KeyCode::Down, KeyModifiers::NONE) => self.dismiss_then(ReedlineEvent::NextHistory),
             // 弹窗关着时 Tab 把它打开。菜单已激活时这是空操作
             // （`handle_editor_event` 的 `Menu` 分支：`if self.active_menu().is_none()`），
             // 与「没有候选就没有弹窗」一致。
@@ -119,8 +122,7 @@ impl ConsoleEditMode {
             (KeyCode::Esc, KeyModifiers::NONE) => {
                 // 弹窗没了，连同它的循环状态一起 —— 收起就是丢掉，下次是
                 // 全新的一份。
-                self.tab_cycles = false;
-                self.cursor.dismiss();
+                self.dismiss();
                 ReedlineEvent::Esc
             }
 
@@ -132,12 +134,22 @@ impl ConsoleEditMode {
             // 有菜单激活`），键位绑定拦不住；而且它判的是 `is_active()`，我们
             // 那个不画出来的空菜单照样满足。于是先发一个 Esc 把菜单停掉，再让
             // 回车走它原本的提交路径。
-            (KeyCode::Enter, KeyModifiers::NONE) => {
-                ReedlineEvent::Multiple(vec![ReedlineEvent::Esc, ReedlineEvent::Enter])
-            }
+            (KeyCode::Enter, KeyModifiers::NONE) => self.dismiss_then(ReedlineEvent::Enter),
 
             _ => return None,
         })
+    }
+
+    /// 丢掉当前补全会话在按键层的全部镜像。
+    fn dismiss(&mut self) {
+        self.tab_cycles = false;
+        self.cursor.dismiss();
+    }
+
+    /// 先停用 reedline 里的菜单，再执行本来要做的事。
+    fn dismiss_then(&mut self, event: ReedlineEvent) -> ReedlineEvent {
+        self.dismiss();
+        ReedlineEvent::Multiple(vec![ReedlineEvent::Esc, event])
     }
 
     /// 内容变了就让补全菜单跟上。
@@ -168,9 +180,9 @@ impl ConsoleEditMode {
     /// 连按 Tab 就在候选间循环，而不是把它们一条条摞进行里。
     fn use_suggestion(&mut self, backwards: bool) -> ReedlineEvent {
         let cycle = if backwards {
-            ReedlineEvent::MenuPrevious
+            ReedlineEvent::MenuUp
         } else {
-            ReedlineEvent::MenuNext
+            ReedlineEvent::MenuDown
         };
 
         if self.tab_cycles {
@@ -199,13 +211,22 @@ impl EditMode for ConsoleEditMode {
             return routed;
         }
 
-        // 弹窗不要的键：先交给编辑器本体，再按内容变没变决定要不要刷新菜单。
+        // 弹窗不要的键：先交给编辑器本体，再按事件的实际语义维护补全会话。
         // 粘贴（`Event::Paste`）也走这一路 —— reedline 会把它化成
         // `Edit([InsertString])`，于是同样被认作「内容变了」。
         match ReedlineRawEvent::try_from(event) {
             Ok(event) => {
                 let resolved = self.inner.parse_event(event);
-                self.refresh_menu(resolved)
+                if changes_buffer(&resolved) {
+                    self.refresh_menu(resolved)
+                } else if moves_cursor(&resolved) && !self.cursor.is_dismissed() {
+                    // 保留 inner 的完整事件，而不是把 Left/Right 等重新手抄一
+                    // 遍。这样自定义、Vi/Helix 以及带选择的移动仍按原义工作；
+                    // Esc 只负责让菜单别吞掉其中的后备光标事件。
+                    self.dismiss_then(resolved)
+                } else {
+                    resolved
+                }
             }
             // 只有 `KeyEventKind::Release` 会被拒，reedline 本来就忽略它。
             Err(()) => ReedlineEvent::None,
@@ -226,6 +247,35 @@ fn changes_buffer(event: &ReedlineEvent) -> bool {
         }
         _ => false,
     }
+}
+
+/// 这个事件是否包含光标/历史走位。
+///
+/// `UntilFound([MenuLeft, Left])` 是最重要的一例：不能只看外层事件，也不能
+/// 丢掉菜单事件之后的后备动作。内容修改优先于这里；一个同时编辑并移动的
+/// 复合事件应刷新新内容的补全，而不是把它关掉。
+fn moves_cursor(event: &ReedlineEvent) -> bool {
+    match event {
+        ReedlineEvent::Edit(commands) => commands.iter().any(moves_cursor_command),
+        ReedlineEvent::Multiple(events) | ReedlineEvent::UntilFound(events) => {
+            events.iter().any(moves_cursor)
+        }
+        ReedlineEvent::PreviousHistory
+        | ReedlineEvent::NextHistory
+        | ReedlineEvent::Up
+        | ReedlineEvent::Down
+        | ReedlineEvent::Left
+        | ReedlineEvent::Right
+        | ReedlineEvent::ToStart
+        | ReedlineEvent::ToEnd => true,
+        _ => false,
+    }
+}
+
+fn moves_cursor_command(command: &EditCommand) -> bool {
+    let kind = command.edit_type();
+    kind == EditCommand::MoveLeft { select: false }.edit_type()
+        || kind == EditCommand::SelectAll.edit_type()
 }
 
 /// 一条编辑指令会不会改动内容。
@@ -275,6 +325,12 @@ mod tests {
         press(mode, code, KeyModifiers::NONE)
     }
 
+    fn inner_event(code: KeyCode, modifiers: KeyModifiers) -> ReedlineEvent {
+        let raw = ReedlineRawEvent::try_from(Event::Key(KeyEvent::new(code, modifiers)))
+            .expect("按下事件不该被拒");
+        reedline::Emacs::default().parse_event(raw)
+    }
+
     /// 弹窗可见时 ↑↓ 归弹窗。
     #[test]
     fn arrows_belong_to_the_popup_while_it_is_visible() {
@@ -287,15 +343,21 @@ mod tests {
     #[test]
     fn arrows_belong_to_history_while_the_popup_is_hidden() {
         let mut mode = mode(false);
-        assert_eq!(tap(&mut mode, KeyCode::Up), ReedlineEvent::PreviousHistory);
-        assert_eq!(tap(&mut mode, KeyCode::Down), ReedlineEvent::NextHistory);
+        assert_eq!(
+            tap(&mut mode, KeyCode::Up),
+            ReedlineEvent::Multiple(vec![ReedlineEvent::Esc, ReedlineEvent::PreviousHistory])
+        );
+        assert_eq!(
+            tap(&mut mode, KeyCode::Down),
+            ReedlineEvent::Multiple(vec![ReedlineEvent::Esc, ReedlineEvent::NextHistory])
+        );
     }
 
     fn cycle_then_accept(forward: bool) -> ReedlineEvent {
         let cycle = if forward {
-            ReedlineEvent::MenuNext
+            ReedlineEvent::MenuDown
         } else {
-            ReedlineEvent::MenuPrevious
+            ReedlineEvent::MenuUp
         };
         ReedlineEvent::Multiple(vec![cycle, ReedlineEvent::MenuAccept])
     }
@@ -349,14 +411,18 @@ mod tests {
         assert_eq!(tap(&mut mode, KeyCode::Tab), ReedlineEvent::MenuAccept);
     }
 
-    /// Esc 把弹窗连同循环状态一起丢掉。
+    /// Esc 把弹窗连同循环状态一起丢掉；下一次 Tab 重新打开，而不是采用
+    /// 上一帧残留的候选。
     #[test]
     fn escape_resets_the_cycle() {
         let mut mode = mode(true);
         tap(&mut mode, KeyCode::Tab);
         tap(&mut mode, KeyCode::Esc);
 
-        assert_eq!(tap(&mut mode, KeyCode::Tab), ReedlineEvent::MenuAccept);
+        assert_eq!(
+            tap(&mut mode, KeyCode::Tab),
+            ReedlineEvent::Menu(MENU.to_owned())
+        );
     }
 
     /// 弹窗关着时 Tab 把它打开，Shift+Tab 无事可做。
@@ -373,6 +439,25 @@ mod tests {
     #[test]
     fn escape_hides_the_popup() {
         assert_eq!(tap(&mut mode(true), KeyCode::Esc), ReedlineEvent::Esc);
+    }
+
+    /// 同一输入批次会先解析完所有按键、再交给引擎。Esc 后不能继续相信菜单
+    /// 上一帧发布的 `visible = true`。
+    #[test]
+    fn escape_takes_effect_before_the_engine_handles_the_batch() {
+        let mut history = mode(true);
+        tap(&mut history, KeyCode::Esc);
+        assert_eq!(
+            tap(&mut history, KeyCode::Up),
+            ReedlineEvent::Multiple(vec![ReedlineEvent::Esc, ReedlineEvent::PreviousHistory])
+        );
+
+        let mut completion = mode(true);
+        tap(&mut completion, KeyCode::Esc);
+        assert_eq!(
+            tap(&mut completion, KeyCode::Tab),
+            ReedlineEvent::Menu(MENU.to_owned())
+        );
     }
 
     /// 回车永远是提交，先把菜单停掉再走。
@@ -431,9 +516,11 @@ mod tests {
         assert_eq!(parts.first(), Some(&ReedlineEvent::Menu(MENU.to_owned())));
     }
 
-    /// 纯移动光标不算改动，不该惊动菜单：只有值变了才该重算。
+    /// 光标移动采用底层编辑模式原本的语义，但先终止当前补全会话。特别是
+    /// Left/Right 的底层事件本身含有 MenuLeft/MenuRight；菜单不先停用就会
+    /// 吞掉真正的光标移动。
     #[test]
-    fn moving_the_cursor_leaves_the_menu_alone() {
+    fn moving_the_cursor_dismisses_completion_and_preserves_the_inner_event() {
         let cases = [
             (KeyCode::Left, KeyModifiers::NONE),
             (KeyCode::Right, KeyModifiers::NONE),
@@ -444,13 +531,27 @@ mod tests {
         ];
 
         for (code, modifiers) in cases {
-            let event = press(&mut mode(false), code, modifiers);
-            assert!(
-                !matches!(&event, ReedlineEvent::Multiple(parts)
-                    if parts.contains(&ReedlineEvent::Menu(MENU.to_owned()))),
-                "{code:?}+{modifiers:?} 不该开菜单: {event:?}"
+            let expected =
+                ReedlineEvent::Multiple(vec![ReedlineEvent::Esc, inner_event(code, modifiers)]);
+            assert_eq!(
+                press(&mut mode(true), code, modifiers),
+                expected,
+                "{code:?}+{modifiers:?}"
             );
         }
+    }
+
+    /// 补全已经停用后，普通移动不再重复发 Esc；否则 Shift+方向键建立的选区
+    /// 会在每一步之前被清掉。
+    #[test]
+    fn moving_after_completion_was_dismissed_is_just_the_inner_event() {
+        let mut mode = mode(true);
+        tap(&mut mode, KeyCode::Esc);
+
+        assert_eq!(
+            tap(&mut mode, KeyCode::Home),
+            inner_event(KeyCode::Home, KeyModifiers::NONE)
+        );
     }
 
     /// 分类照抄自 reedline 的 `edit_type()`，抽查两侧各几条。
