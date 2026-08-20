@@ -438,8 +438,8 @@ dependencies = [
 
 [[package]]
 name = "reedline"
-version = "0.50.0"
-source = "git+https://github.com/peter2500zz/reedline?branch=fix%2Fcpr-capability-fallback#ede0fe5a2502f2f54df4c65a64c45b071584fdba"
+version = "0.50.1"
+source = "git+https://github.com/peter2500zz/reedline#20d0c12923ce349b0ef8adc52756927c1c496163"
 dependencies = [
  "chrono",
  "crossbeam",
@@ -577,7 +577,7 @@ checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
 name = "smaragdine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "azalea-brigadier",
  "crossbeam",
