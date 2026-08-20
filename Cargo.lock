@@ -438,8 +438,8 @@ dependencies = [
 
 [[package]]
 name = "reedline"
-version = "0.50.1"
-source = "git+https://github.com/peter2500zz/reedline?branch=smaragdine#20d0c12923ce349b0ef8adc52756927c1c496163"
+version = "0.50.2"
+source = "git+https://github.com/peter2500zz/reedline?branch=smaragdine#c036b5c65660ab766210201a77aba706efd977f8"
 dependencies = [
  "chrono",
  "crossbeam",
