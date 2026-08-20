@@ -85,6 +85,12 @@ impl<C: Context> Highlighter for BrigadierHighlighter<C> {
         }
         styled
     }
+
+    fn highlight_final(&self, line: &str, _cursor: usize) -> StyledText {
+        self.shadow.record(line);
+        self.aside.set(None);
+        styled_line(&self.dispatcher, &self.source, &self.paint, line)
+    }
 }
 
 impl<C: Context> BrigadierHighlighter<C> {
@@ -271,10 +277,12 @@ fn argument_ranges<C: Context>(
 mod tests {
     use super::*;
     use crate::{
+        prompt::ConsolePrompt,
         testing::{Nothing, dispatcher, source},
         theme::default_paint,
     };
     use nu_ansi_term::Color;
+    use reedline::Prompt;
 
     fn paint() -> Paint {
         Arc::new(default_paint)
@@ -301,6 +309,54 @@ mod tests {
 
     fn colour(piece: Piece, index: usize) -> Option<Color> {
         default_paint(&Token::new(piece, index, "x")).foreground
+    }
+
+    fn highlighter() -> (BrigadierHighlighter<Nothing>, Aside, LineShadow) {
+        let aside = Aside::new();
+        let shadow = LineShadow::new();
+        let highlighter = BrigadierHighlighter::new(
+            dispatcher(),
+            source(),
+            Text::default(),
+            paint(),
+            shadow.clone(),
+            MenuCursor::new(),
+            aside.clone(),
+        );
+        (highlighter, aside, shadow)
+    }
+
+    #[test]
+    fn final_highlight_drops_ghost_text_and_the_aside() {
+        let (highlighter, aside, shadow) = highlighter();
+        let prompt = ConsolePrompt::new(aside, "> ".to_owned(), Text::default(), paint(), None);
+
+        assert_eq!(highlighter.highlight("ec", 2).raw_string(), "echo");
+        let _ = highlighter.highlight("echo ", 5);
+        assert!(
+            prompt.render_prompt_right().contains("<message>"),
+            "交互绘制应当提供右提示"
+        );
+
+        let final_line = highlighter.highlight_final("ec", 2);
+        assert_eq!(final_line.raw_string(), "ec");
+        assert_eq!(prompt.render_prompt_right(), "");
+        assert!(!shadow.was_empty(), "最终绘制仍须记录 Ctrl-C 前的真实输入");
+    }
+
+    #[test]
+    fn final_highlight_keeps_syntax_colouring() {
+        let (highlighter, _, _) = highlighter();
+        let final_line = highlighter.highlight_final("echo hello", 10);
+
+        assert_eq!(final_line.raw_string(), "echo hello");
+        assert_eq!(final_line.buffer[0].1, "echo ");
+        assert_eq!(final_line.buffer[0].0.foreground, colour(Piece::Literal, 0));
+        assert_eq!(final_line.buffer[1].1, "hello");
+        assert_eq!(
+            final_line.buffer[1].0.foreground,
+            colour(Piece::Argument, 0)
+        );
     }
 
     /// 指令名是字面量 —— 分类不表示合法性。
