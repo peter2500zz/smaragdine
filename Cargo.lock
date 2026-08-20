@@ -439,7 +439,7 @@ dependencies = [
 [[package]]
 name = "reedline"
 version = "0.50.0"
-source = "git+https://github.com/peter2500zz/reedline?branch=fix%2Fcpr-capability-fallback#05e8f955e6649c96667f5658c45c4d47b7624808"
+source = "git+https://github.com/peter2500zz/reedline?branch=fix%2Fcpr-capability-fallback#ede0fe5a2502f2f54df4c65a64c45b071584fdba"
 dependencies = [
  "chrono",
  "crossbeam",
