@@ -439,7 +439,7 @@ dependencies = [
 [[package]]
 name = "reedline"
 version = "0.50.0"
-source = "git+https://github.com/peter2500zz/reedline?branch=feat%2Fmenu-accept#ee120676c519b8dce9f0f59a824569d6c93f2a4e"
+source = "git+https://github.com/peter2500zz/reedline?branch=fix%2Fcpr-capability-fallback#d541f495edd19cf32ab04ff56c6dec0ccbd3da2b"
 dependencies = [
  "chrono",
  "crossbeam",

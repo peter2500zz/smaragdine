@@ -23,7 +23,7 @@ azalea-brigadier = { git = "https://github.com/peter2500zz/azalea", branch = "sm
 # 下一条候选。而 reedline 只有一条采用候选的路径，写死在回车里，且采用完就
 # 停用菜单，循环无从谈起。fork 加了 ReedlineEvent::MenuAccept：采用但保留
 # 菜单，并对着算补全时的缓冲区套用，于是第二次采用是替换而非追加。
-reedline = { git = "https://github.com/peter2500zz/reedline", branch = "feat/menu-accept", default-features = false, features = [
+reedline = { git = "https://github.com/peter2500zz/reedline", branch = "fix/cpr-capability-fallback", default-features = false, features = [
     "external_printer",
 ] }
 # 版本对齐 reedline 的依赖（0.29），否则 Event 会是两个不同的类型。
