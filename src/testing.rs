@@ -6,21 +6,17 @@
 //! * `quit` —— 没写说明，用来验证「不该凭空造一句」
 //! * `proxy on|off` 与 `log on|level <n>` —— 两个 `on` 共存，正是把说明挂在
 //!   节点上才成立的事
-//! * `open` 只在 `unlocked` 时可用 —— 验证 `requires` 与真实上下文
+//! * `open` 只在 `unlocked` 时可用 —— 验证 `requires` 与真实状态
 
 use std::sync::Arc;
 
 use azalea_brigadier::{command_dispatcher::CommandDispatcher, prelude::*};
 
-use crate::{Context, Source};
+use crate::Source;
 
-/// 一份最小的上下文。
+/// 一份最小的状态。
 pub(crate) struct Nothing {
     pub(crate) unlocked: bool,
-}
-
-impl Context for Nothing {
-    type Exit = i32;
 }
 
 pub(crate) fn source() -> Source<Nothing> {
@@ -76,7 +72,7 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
     tree.register(
         literal("open")
             .describe("只有解锁时才可用")
-            .requires(|s: &Source<Nothing>| s.context().unlocked)
+            .requires(|s: &Source<Nothing>| s.state().unlocked)
             .executes(|_: &CommandContext<Source<Nothing>>| 1),
     );
 

@@ -19,20 +19,35 @@ use azalea_brigadier::{
 };
 use reedline::{Completer, CompletionResult, Span, Suggestion};
 
-use crate::{Context, Source};
+use crate::Source;
 
-pub(crate) struct BrigadierCompleter<C: Context> {
-    dispatcher: Arc<CommandDispatcher<Source<C>>>,
-    source: Source<C>,
+pub(crate) struct BrigadierCompleter<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    dispatcher: Arc<CommandDispatcher<Source<S, R>>>,
+    source: Source<S, R>,
 }
 
-impl<C: Context> BrigadierCompleter<C> {
-    pub(crate) fn new(dispatcher: Arc<CommandDispatcher<Source<C>>>, source: Source<C>) -> Self {
+impl<S, R> BrigadierCompleter<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    pub(crate) fn new(
+        dispatcher: Arc<CommandDispatcher<Source<S, R>>>,
+        source: Source<S, R>,
+    ) -> Self {
         Self { dispatcher, source }
     }
 }
 
-impl<C: Context> Completer for BrigadierCompleter<C> {
+impl<S, R> Completer for BrigadierCompleter<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     fn complete(&mut self, line: &str, pos: usize) -> CompletionResult {
         CompletionResult::fresh(suggest(&self.dispatcher, &self.source, line, pos))
     }
@@ -43,12 +58,16 @@ impl<C: Context> Completer for BrigadierCompleter<C> {
 /// 解析在 `catch_unwind` 里跑：这段代码对着每一次击键、以任意半成品输入
 /// 运行，是整个控制台最容易被意外输入打到的地方。解析器崩了顶多这一次没有
 /// 补全，不该把控制台一起带走。
-pub(crate) fn suggest<C: Context>(
-    dispatcher: &CommandDispatcher<Source<C>>,
-    source: &Source<C>,
+pub(crate) fn suggest<S, R>(
+    dispatcher: &CommandDispatcher<Source<S, R>>,
+    source: &Source<S, R>,
     line: &str,
     pos: usize,
-) -> Vec<Suggestion> {
+) -> Vec<Suggestion>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let parse = dispatcher.parse(StringReader::from(line), source.clone());
         // get_completion_suggestions 会把 parse 吃掉，所以先把要用的留下来。
@@ -99,7 +118,7 @@ pub(crate) fn suggest<C: Context>(
 /// 因为 Mojang 那边是给每个玩家下发过滤好的树，客户端根本看不到用不了的
 /// 指令。而控制台是一棵共享的树，`requires` 就是唯一的闸门 —— 不在这里滤，
 /// 同一条指令会同时有三种说法：菜单里有它、输进去标红、回车说不认识。
-fn usable<C: Context>(parent: &CommandNode<Source<C>>, source: &Source<C>, value: &str) -> bool {
+fn usable<S, R>(parent: &CommandNode<Source<S, R>>, source: &Source<S, R>, value: &str) -> bool {
     // 字面量对得上，就问它自己。
     if let Some(node) = parent.literals.get(value) {
         return node.read().can_use(source);
@@ -123,9 +142,9 @@ fn usable<C: Context>(parent: &CommandNode<Source<C>>, source: &Source<C>, value
 /// 是唯一的反馈通道，指令名打全反而什么都不显示，看着倒像是打错了。
 ///
 /// 所以这里有意偏离一点：合法指令名照常列出自身，说明照旧从节点上取。
-fn exact_literal_match<C: Context>(
-    at_cursor: &SuggestionContext<Source<C>, i32>,
-    source: &Source<C>,
+fn exact_literal_match<S, R>(
+    at_cursor: &SuggestionContext<Source<S, R>, i32>,
+    source: &Source<S, R>,
     line: &str,
     pos: usize,
 ) -> Option<Suggestion> {
@@ -341,13 +360,13 @@ mod tests {
     }
 
     /// requires 判不过的指令不该出现在菜单里 —— 而它判定时拿到的是真实
-    /// 上下文，所以「看得见」与「跑得动」始终是同一回事。
+    /// 状态，所以「看得见」与「跑得动」始终是同一回事。
     #[test]
     fn a_command_you_cannot_use_is_not_offered() {
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         tree.register(
             literal("open")
-                .requires(|s: &Source<Nothing>| s.context().unlocked)
+                .requires(|s: &Source<Nothing>| s.state().unlocked)
                 .executes(|_: &CommandContext<Source<Nothing>>| 1),
         );
         let tree = Arc::new(tree);

@@ -23,16 +23,20 @@ use nu_ansi_term::Style;
 use reedline::{Highlighter, StyledText, Suggestion};
 
 use crate::{
-    Context, Source, Text, inspect,
+    Source, Text, inspect,
     interrupt::LineShadow,
     menu::MenuCursor,
     prompt::Aside,
     theme::{Paint, Piece, Token},
 };
 
-pub(crate) struct BrigadierHighlighter<C: Context> {
-    dispatcher: Arc<CommandDispatcher<Source<C>>>,
-    source: Source<C>,
+pub(crate) struct BrigadierHighlighter<S, R = ()>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    dispatcher: Arc<CommandDispatcher<Source<S, R>>>,
+    source: Source<S, R>,
     text: Text,
     paint: Paint,
     /// 顺手记下当前行，供两段式 Ctrl-C 判断按下时行是否为空。
@@ -46,10 +50,14 @@ pub(crate) struct BrigadierHighlighter<C: Context> {
     aside: Aside,
 }
 
-impl<C: Context> BrigadierHighlighter<C> {
+impl<S, R> BrigadierHighlighter<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     pub(crate) fn new(
-        dispatcher: Arc<CommandDispatcher<Source<C>>>,
-        source: Source<C>,
+        dispatcher: Arc<CommandDispatcher<Source<S, R>>>,
+        source: Source<S, R>,
         text: Text,
         paint: Paint,
         shadow: LineShadow,
@@ -68,7 +76,11 @@ impl<C: Context> BrigadierHighlighter<C> {
     }
 }
 
-impl<C: Context> Highlighter for BrigadierHighlighter<C> {
+impl<S, R> Highlighter for BrigadierHighlighter<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     fn highlight(&self, line: &str, cursor: usize) -> StyledText {
         self.shadow.record(line);
 
@@ -93,7 +105,11 @@ impl<C: Context> Highlighter for BrigadierHighlighter<C> {
     }
 }
 
-impl<C: Context> BrigadierHighlighter<C> {
+impl<S, R> BrigadierHighlighter<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     /// 光标处该显示什么灰字。
     ///
     /// 两种来源互斥：菜单里选中了候选就预览它的剩余部分（Tab 才真的插入），
@@ -173,12 +189,16 @@ fn with_ghost(styled: StyledText, at: usize, ghost: &str, paint: &Paint) -> Styl
 ///
 /// 与补全同理，解析包在 `catch_unwind` 里：这段代码对着每一次击键、以任意
 /// 半成品输入运行。真崩了就退回无着色的纯文本，总好过把控制台带走。
-fn styled_line<C: Context>(
-    dispatcher: &CommandDispatcher<Source<C>>,
-    source: &Source<C>,
+fn styled_line<S, R>(
+    dispatcher: &CommandDispatcher<Source<S, R>>,
+    source: &Source<S, R>,
     paint: &Paint,
     line: &str,
-) -> StyledText {
+) -> StyledText
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let parsed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let parse = dispatcher.parse(StringReader::from(line), source.clone());
         let arguments = argument_ranges(&parse.context);
@@ -255,8 +275,8 @@ fn plain(line: &str) -> StyledText {
 ///
 /// 丢掉的那一段会被当成字面量涂灰。顺序也不必自己排 —— 库推进去的就是解析
 /// 顺序，而上色要的正是这个。
-fn argument_ranges<C: Context>(
-    context: &CommandContextBuilder<'_, Source<C>, i32>,
+fn argument_ranges<S, R>(
+    context: &CommandContextBuilder<'_, Source<S, R>, i32>,
 ) -> Vec<StringRange> {
     let mut ranges = Vec::new();
     let mut layer = Some(context);

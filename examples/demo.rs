@@ -16,7 +16,10 @@
 //! * `help` 列顶层，`help log` 往下看一层 —— 路径也能 Tab 补全
 
 use std::{
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
     time::Duration,
 };
 
@@ -24,8 +27,8 @@ use smaragdine::{Text, prelude::*};
 
 /// 交给指令使用的东西。
 ///
-/// 指令跑在各自的线程上，所以里面装的都是能并发读写的东西 —— 这里用原子量
-/// 就够了，真实程序里通常是 `Arc<...>` 之类的句柄。
+/// 指令跑在各自的线程上，所以状态必须能并发读写；整份状态由调用方自己的
+/// `Arc` 共享，控制台、HTTP 服务和后台任务都可以拿同一个句柄。
 struct App {
     proxy: AtomicBool,
     verbose: AtomicBool,
@@ -39,15 +42,19 @@ enum Bye {
     Restart,
 }
 
-impl Context for App {
-    type Exit = Bye;
-}
-
 /// 指令树里到处要写它，取个短名字。
-type Src = Source<App>;
+type State = Arc<App>;
+type Src = Source<State, Bye>;
 
 fn main() {
-    let console = Console::builder()
+    let state = Arc::new(App {
+        proxy: AtomicBool::new(false),
+        verbose: AtomicBool::new(false),
+        unlocked: AtomicBool::new(false),
+        ticks: AtomicU64::new(0),
+    });
+
+    let console = Console::<State, Bye>::builder_with_reason()
         // 库自己会说的那几句话，换成中文。
         .text(Text {
             exit_hint: "  再按一次 Ctrl-C 退出".to_owned(),
@@ -83,7 +90,7 @@ fn main() {
         )
         .command(literal("status").describe("看看现在是什么状态").executes(
             |ctx: &CommandContext<Src>| {
-                let app = ctx.source.context();
+                let app = ctx.source.state();
                 ctx.source.printer().print(format!(
                     "代理 {} / 详细日志 {} / {} / 后台已跑 {} 轮",
                     onoff(app.proxy.load(Ordering::Relaxed)),
@@ -128,7 +135,7 @@ fn main() {
         )
         .command(literal("unlock").describe("解锁危险指令").executes(
             |ctx: &CommandContext<Src>| {
-                ctx.source.context().unlocked.store(true, Ordering::Relaxed);
+                ctx.source.state().unlocked.store(true, Ordering::Relaxed);
                 ctx.source.printer().print("已解锁，danger 现在可用了");
                 1
             },
@@ -137,20 +144,17 @@ fn main() {
             literal("lock")
                 .describe("锁回去")
                 .executes(|ctx: &CommandContext<Src>| {
-                    ctx.source
-                        .context()
-                        .unlocked
-                        .store(false, Ordering::Relaxed);
+                    ctx.source.state().unlocked.store(false, Ordering::Relaxed);
                     ctx.source.printer().print("已上锁");
                     1
                 }),
         )
         // requires 判不过时，这条指令连菜单里都不会出现。判定用的是真实
-        // 上下文，所以「看得见」与「跑得动」始终是同一回事。
+        // 状态，所以「看得见」与「跑得动」始终是同一回事。
         .command(
             literal("danger")
                 .describe("解锁之后才看得见的指令")
-                .requires(|s: &Src| s.context().unlocked.load(Ordering::Relaxed))
+                .requires(|s: &Src| s.state().unlocked.load(Ordering::Relaxed))
                 .executes(|ctx: &CommandContext<Src>| {
                     ctx.source.printer().print("砰");
                     1
@@ -196,21 +200,16 @@ fn main() {
                     1
                 }),
         )
-        .build(App {
-            proxy: AtomicBool::new(false),
-            verbose: AtomicBool::new(false),
-            unlocked: AtomicBool::new(false),
-            ticks: AtomicU64::new(0),
-        });
+        .build(Arc::clone(&state));
 
     // 后台往屏幕上写字：克隆一份接受器带走就行。它落在提示行上方，不会把
     // 你正在编辑的那一行搅乱 —— 真实程序里接的通常是日志系统。
     let printer = console.printer();
-    let source = console.source();
+    let background = Arc::clone(&state);
     std::thread::spawn(move || {
         loop {
             std::thread::sleep(Duration::from_secs(3));
-            let app = source.context();
+            let app = &background;
             let round = app.ticks.fetch_add(1, Ordering::Relaxed) + 1;
             if app.verbose.load(Ordering::Relaxed) {
                 printer.print(format!(
@@ -247,7 +246,7 @@ fn switch(
     literal(&name)
         .describe(about)
         .executes(move |ctx: &CommandContext<Src>| {
-            pick(ctx.source.context()).store(to, Ordering::Relaxed);
+            pick(ctx.source.state()).store(to, Ordering::Relaxed);
             ctx.source
                 .printer()
                 .print(format!("{name} —— 已{}", onoff(to)));

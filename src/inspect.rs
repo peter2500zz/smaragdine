@@ -19,7 +19,7 @@ use azalea_brigadier::{
     context::CommandContextBuilder, string_reader::StringReader, tree::CommandNode,
 };
 
-use crate::{Context, Source, Text, theme::Piece};
+use crate::{Source, Text, theme::Piece};
 
 /// 右侧那一句最多列几个示例。
 ///
@@ -40,13 +40,17 @@ pub(crate) struct Inspection {
 ///
 /// 解析包在 `catch_unwind` 里：这段代码对着每一次击键、以任意半成品输入
 /// 运行。真崩了就当什么都没看出来，总好过把控制台带走。
-pub(crate) fn inspect<C: Context>(
-    dispatcher: &CommandDispatcher<Source<C>>,
-    source: &Source<C>,
+pub(crate) fn inspect<S, R>(
+    dispatcher: &CommandDispatcher<Source<S, R>>,
+    source: &Source<S, R>,
     text: &Text,
     line: &str,
     cursor: usize,
-) -> Inspection {
+) -> Inspection
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let parse = dispatcher.parse(StringReader::from(line), source.clone());
         let context = parse.context.clone();
@@ -91,8 +95,8 @@ pub(crate) fn inspect<C: Context>(
 ///
 /// 位置标记、出错 token 那些细节不在这里给 —— 右侧只有一行的地方，而回车
 /// 执行时 brigadier 会把完整错误报出来。
-fn failure<C: Context>(
-    context: &CommandContextBuilder<'_, Source<C>, i32>,
+fn failure<S, R>(
+    context: &CommandContextBuilder<'_, Source<S, R>, i32>,
     text: &Text,
     line: &str,
     has_leftover: bool,
@@ -117,8 +121,8 @@ fn failure<C: Context>(
 ///
 /// 建议上下文的起点就是当前 token 的起点；光标正好在起点上，说明这个 token
 /// 一个字都还没打。
-fn token_is_empty<C: Context>(
-    context: &CommandContextBuilder<'_, Source<C>, i32>,
+fn token_is_empty<S, R>(
+    context: &CommandContextBuilder<'_, Source<S, R>, i32>,
     cursor: usize,
 ) -> bool {
     if context.range.start() > cursor {
@@ -135,8 +139,8 @@ fn token_is_empty<C: Context>(
 /// 用光标处的建议上下文取 parent，而不是 `context.nodes.last()` —— 参数已经
 /// 打了一半时，最后一个匹配节点就是那个参数本身，它底下再没有参数了，
 /// 于是问它会得到「什么都不缺」。
-fn expected_at<C: Context>(
-    context: &CommandContextBuilder<'_, Source<C>, i32>,
+fn expected_at<S, R>(
+    context: &CommandContextBuilder<'_, Source<S, R>, i32>,
     cursor: usize,
 ) -> Option<(String, Option<String>)> {
     // 范围起点在光标之后时 find_suggestion_context 会 panic，先挡掉。
@@ -163,7 +167,7 @@ fn expected_at<C: Context>(
 }
 
 /// 这个参数收什么形状的东西，用几个例子说明。
-fn examples_of<C: Context>(node: &CommandNode<Source<C>>) -> Option<String> {
+fn examples_of<S, R>(node: &CommandNode<Source<S, R>>) -> Option<String> {
     let ArgumentBuilderType::Argument(argument) = &node.value else {
         return None;
     };
@@ -182,7 +186,7 @@ fn examples_of<C: Context>(node: &CommandNode<Source<C>>) -> Option<String> {
 /// 这一行是否已经挂上了可执行的指令。
 ///
 /// 重定向与子指令会把上下文串成一条链，只看最外层会漏掉后半截。
-fn is_runnable<C: Context>(context: &CommandContextBuilder<'_, Source<C>, i32>) -> bool {
+fn is_runnable<S, R>(context: &CommandContextBuilder<'_, Source<S, R>, i32>) -> bool {
     context.command.is_some() || context.child.as_deref().is_some_and(is_runnable)
 }
 

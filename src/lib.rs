@@ -2,6 +2,7 @@
 //!
 //! ```no_run
 //! use smaragdine::prelude::*;
+//! use std::sync::Arc;
 //!
 //! struct App;
 //!
@@ -10,16 +11,17 @@
 //!     Restart,
 //! }
 //!
-//! impl Context for App {
-//!     type Exit = Bye;
-//! }
+//! type State = Arc<App>;
+//! type Src = Source<State, Bye>;
 //!
-//! let console = Console::builder()
+//! let state = Arc::new(App);
+//!
+//! let console = Console::<State, Bye>::builder_with_reason()
 //!     .command(
 //!         literal("echo").describe("把参数原样输出").then(
 //!             argument("message", greedy_string())
 //!                 .describe("要输出的内容")
-//!                 .executes(|ctx: &CommandContext<Source<App>>| {
+//!                 .executes(|ctx: &CommandContext<Src>| {
 //!                     ctx.source.printer().print(get_string(ctx, "message").unwrap_or_default());
 //!                     1
 //!                 }),
@@ -28,12 +30,12 @@
 //!     .command(
 //!         literal("stop")
 //!             .describe("关停并退出")
-//!             .executes(|ctx: &CommandContext<Source<App>>| {
+//!             .executes(|ctx: &CommandContext<Src>| {
 //!                 ctx.source.request_exit(Bye::Stop);
 //!                 1
 //!             }),
 //!     )
-//!     .build(App);
+//!     .build(Arc::clone(&state));
 //!
 //! match console.run() {
 //!     Exit::Quit(Bye::Restart) => { /* 重新 exec 自己 */ }
@@ -54,8 +56,8 @@
 //! * **[`Console::run`] 占住调用它的线程**，直到用户退出。每条指令在自己的
 //!   线程上跑，所以慢指令不挡下一条输入。
 //! * **指令说明写在节点上**（`describe()`），补全菜单直接读，没有第二张表。
-//! * **`requires` 在每一次击键时都会跑**，且拿得到真实上下文 —— 只该读廉价
-//!   状态，见 [`Source::context`]。
+//! * **`requires` 在每一次击键时都会跑**，且拿得到真实状态 —— 只该读廉价
+//!   状态，见 [`Source::state`]。
 
 mod completer;
 mod help;
@@ -85,12 +87,12 @@ use reedline::{EditMode, Emacs, ExternalPrinter, History, Reedline, ReedlineMenu
 
 pub use help::{Help, Usage, help, usage};
 pub use printer::Printer;
-pub use source::{Context, Source};
+pub use source::Source;
 pub use text::Text;
 pub use theme::{Paint, Piece, Token, default_paint};
 
 // 两个 fork 都得由本库重导出：使用者必须与库用的是同一份 crate，否则
-// `Source<C>` 与 `CommandDispatcher` 会是两个互不相认的类型。
+// `Source<S, R>` 与 `CommandDispatcher` 会是两个互不相认的类型。
 pub use azalea_brigadier as brigadier;
 pub use nu_ansi_term;
 pub use reedline;
@@ -98,8 +100,7 @@ pub use reedline;
 /// 常用的那些东西，外加 brigadier 的建树函数。
 pub mod prelude {
     pub use crate::{
-        Console, ConsoleBuilder, Context, Exit, Help, Paint, Piece, Printer, Source, Text, Token,
-        Usage,
+        Console, ConsoleBuilder, Exit, Help, Paint, Piece, Printer, Source, Text, Token, Usage,
     };
     pub use azalea_brigadier::prelude::*;
 }
@@ -113,9 +114,11 @@ const PRINTER_CAPACITY: usize = 256;
 const MENU_NAME: &str = "completion_menu";
 
 /// 控制台为何结束。
-pub enum Exit<C: Context> {
+///
+/// `R` 是指令主动退出时携带的原因；不需要原因时保持默认的 `()` 即可。
+pub enum Exit<R = ()> {
     /// 某条指令请求了退出，带着它留下的意向。
-    Quit(C::Exit),
+    Quit(R),
     /// 用户按了 Ctrl-D，或在空行上连按了两次 Ctrl-C。没有指令表态，怎么
     /// 收尾由你定。
     Interrupted,
@@ -132,12 +135,16 @@ pub enum Exit<C: Context> {
 }
 
 /// 指令没跑成时怎么说。
-type OnError<C> = Arc<dyn Fn(&CommandSyntaxError, &Source<C>) + Send + Sync>;
+type OnError<S, R> = Arc<dyn Fn(&CommandSyntaxError, &Source<S, R>) + Send + Sync>;
 
 /// 一个装好了的控制台。
-pub struct Console<C: Context> {
-    dispatcher: Arc<CommandDispatcher<Source<C>>>,
-    source: Source<C>,
+pub struct Console<S, R = ()>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    dispatcher: Arc<CommandDispatcher<Source<S, R>>>,
+    source: Source<S, R>,
     printer: Printer,
     text: Text,
     paint: Paint,
@@ -145,12 +152,19 @@ pub struct Console<C: Context> {
     indicator: String,
     history: Box<dyn History>,
     edit_mode: Box<dyn EditMode>,
-    on_error: OnError<C>,
+    on_error: OnError<S, R>,
 }
 
-impl<C: Context> Console<C> {
-    /// 开始搭一个控制台。
-    pub fn builder() -> ConsoleBuilder<C> {
+impl<S, R> Console<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    /// 开始搭一个会携带自定义退出原因的控制台。
+    ///
+    /// 不需要退出原因时用 [`Console::builder`]，便不必在命令源上多写一个
+    /// 泛型参数。
+    pub fn builder_with_reason() -> ConsoleBuilder<S, R> {
         ConsoleBuilder::new()
     }
 
@@ -159,9 +173,12 @@ impl<C: Context> Console<C> {
         self.printer.clone()
     }
 
-    /// 你的上下文。
-    pub fn context(&self) -> &C {
-        self.source.context()
+    /// 你的应用状态。
+    ///
+    /// 若交进来的是 `Arc<T>`，这里得到的就是 `&Arc<T>`；需要带走一份时直接
+    /// `Arc::clone(console.state())`。
+    pub fn state(&self) -> &S {
+        self.source.state()
     }
 
     /// 指令看到的那个源。
@@ -172,9 +189,9 @@ impl<C: Context> Console<C> {
     /// ```
     /// # use smaragdine::prelude::*;
     /// # struct App;
-    /// # impl Context for App { type Exit = i32; }
-    /// # let console = Console::builder()
-    /// #     .command(literal("stop").executes(|ctx: &CommandContext<Source<App>>| {
+    /// # type Src = Source<App, i32>;
+    /// # let console = Console::<App, i32>::builder_with_reason()
+    /// #     .command(literal("stop").executes(|ctx: &CommandContext<Src>| {
     /// #         ctx.source.request_exit(0);
     /// #         1
     /// #     }))
@@ -182,12 +199,12 @@ impl<C: Context> Console<C> {
     /// let dispatcher = console.dispatcher();
     /// dispatcher.execute("stop", console.source()).unwrap();
     /// ```
-    pub fn source(&self) -> Source<C> {
+    pub fn source(&self) -> Source<S, R> {
         self.source.clone()
     }
 
     /// 指令树。想在控制台之外执行一行时要用到它。
-    pub fn dispatcher(&self) -> Arc<CommandDispatcher<Source<C>>> {
+    pub fn dispatcher(&self) -> Arc<CommandDispatcher<Source<S, R>>> {
         Arc::clone(&self.dispatcher)
     }
 
@@ -196,7 +213,7 @@ impl<C: Context> Console<C> {
     /// 占住调用它的线程。期间 [`Printer`] 会被接到 external printer 上；
     /// 返回前恢复成直接写 stdout —— 否则关停阶段的输出会写进一个没人再读的
     /// 通道里。
-    pub fn run(self) -> Exit<C> {
+    pub fn run(self) -> Exit<R> {
         // 后台运行、输出被重定向、容器里没分配 tty —— 这些场景下没有可交互
         // 的终端。必须提前判掉，理由见 Exit::NoTerminal。
         if !std::io::stdin().is_terminal() {
@@ -302,6 +319,30 @@ impl<C: Context> Console<C> {
     }
 }
 
+impl<S> Console<S>
+where
+    S: Send + Sync + 'static,
+{
+    /// 开始搭一个控制台。
+    ///
+    /// 状态类型由最后的 [`ConsoleBuilder::build`] 推导；它可以是 `Arc<T>`、
+    /// 自定义包装或任何满足线程安全约束的类型，不需要实现库 trait。
+    ///
+    /// ```
+    /// use smaragdine::Console;
+    /// use std::sync::Arc;
+    ///
+    /// struct App;
+    /// let state = Arc::new(App);
+    /// let console = Console::builder().build(Arc::clone(&state));
+    ///
+    /// assert!(Arc::ptr_eq(console.state(), &state));
+    /// ```
+    pub fn builder() -> ConsoleBuilder<S> {
+        ConsoleBuilder::new()
+    }
+}
+
 /// 把一行指令投出去执行。
 ///
 /// 每条指令一个线程，控制台立刻回到 `read_line` —— 于是上一条不拦下一条，
@@ -310,13 +351,16 @@ impl<C: Context> Console<C> {
 ///
 /// 用系统线程而不是异步任务：指令体是同步代码，想等一个网络请求就得
 /// `block_on`，那在运行时线程里会 panic，在普通线程里才是合法用法。
-fn dispatch<C: Context>(
-    dispatcher: &Arc<CommandDispatcher<Source<C>>>,
-    source: &Source<C>,
-    on_error: &OnError<C>,
+fn dispatch<S, R>(
+    dispatcher: &Arc<CommandDispatcher<Source<S, R>>>,
+    source: &Source<S, R>,
+    on_error: &OnError<S, R>,
     text: &Text,
     line: &str,
-) {
+) where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let spawned = {
         let (dispatcher, source, on_error, text, line) = (
             Arc::clone(dispatcher),
@@ -344,13 +388,16 @@ fn dispatch<C: Context>(
 /// 但一条指令写崩了不该把整个程序带走 —— 何况它现在跑在自己的线程上。
 ///
 /// 于是使用方**不能**设 `panic = "abort"`。
-fn execute<C: Context>(
-    dispatcher: &CommandDispatcher<Source<C>>,
-    source: &Source<C>,
-    on_error: &OnError<C>,
+fn execute<S, R>(
+    dispatcher: &CommandDispatcher<Source<S, R>>,
+    source: &Source<S, R>,
+    on_error: &OnError<S, R>,
     text: &Text,
     line: &str,
-) {
+) where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         dispatcher.execute(line, source.clone())
     }));
@@ -363,8 +410,15 @@ fn execute<C: Context>(
 }
 
 /// 搭控制台。
-pub struct ConsoleBuilder<C: Context> {
-    dispatcher: CommandDispatcher<Source<C>>,
+///
+/// `S` 是调用方原样交进来的状态；`R` 是可选的退出原因，默认 `()`。状态的
+/// 包装形状不属于本库 API，只要满足跨线程所需的约束即可。
+pub struct ConsoleBuilder<S, R = ()>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    dispatcher: CommandDispatcher<Source<S, R>>,
     printer: Option<Printer>,
     text: Text,
     paint: Paint,
@@ -372,16 +426,24 @@ pub struct ConsoleBuilder<C: Context> {
     indicator: String,
     history: Option<Box<dyn History>>,
     edit_mode: Option<Box<dyn EditMode>>,
-    on_error: Option<OnError<C>>,
+    on_error: Option<OnError<S, R>>,
 }
 
-impl<C: Context> Default for ConsoleBuilder<C> {
+impl<S, R> Default for ConsoleBuilder<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<C: Context> ConsoleBuilder<C> {
+impl<S, R> ConsoleBuilder<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     pub fn new() -> Self {
         Self {
             dispatcher: CommandDispatcher::new(),
@@ -400,7 +462,7 @@ impl<C: Context> ConsoleBuilder<C> {
     ///
     /// 说明写在节点上（`describe()`），补全菜单直接读它 —— 没有第二张表要
     /// 维护，同名子指令（`proxy on` 与 `log on`）也各说各的。
-    pub fn command(mut self, command: impl Into<ArgumentBuilder<Source<C>, i32>>) -> Self {
+    pub fn command(mut self, command: impl Into<ArgumentBuilder<Source<S, R>, i32>>) -> Self {
         self.dispatcher.register(command.into());
         self
     }
@@ -409,7 +471,7 @@ impl<C: Context> ConsoleBuilder<C> {
     ///
     /// 重定向、fork、自定义参数类型这些 [`Self::command`] 表达不了的用法走
     /// 这里 —— brigadier 的全部能力都在，库不挡道。
-    pub fn commands(mut self, build: impl FnOnce(&mut CommandDispatcher<Source<C>>)) -> Self {
+    pub fn commands(mut self, build: impl FnOnce(&mut CommandDispatcher<Source<S, R>>)) -> Self {
         build(&mut self.dispatcher);
         self
     }
@@ -458,7 +520,6 @@ impl<C: Context> ConsoleBuilder<C> {
     /// ```no_run
     /// # use smaragdine::prelude::*;
     /// # struct App;
-    /// # impl Context for App { type Exit = i32; }
     /// use smaragdine::reedline::FileBackedHistory;
     ///
     /// let history = FileBackedHistory::with_file(1000, "history.txt".into())?;
@@ -490,7 +551,6 @@ impl<C: Context> ConsoleBuilder<C> {
     /// ```
     /// # use smaragdine::prelude::*;
     /// # struct App;
-    /// # impl Context for App { type Exit = i32; }
     /// use smaragdine::brigadier::errors::BuiltInError;
     ///
     /// let console = Console::<App>::builder()
@@ -504,19 +564,19 @@ impl<C: Context> ConsoleBuilder<C> {
     /// ```
     pub fn on_error(
         mut self,
-        on_error: impl Fn(&CommandSyntaxError, &Source<C>) + Send + Sync + 'static,
+        on_error: impl Fn(&CommandSyntaxError, &Source<S, R>) + Send + Sync + 'static,
     ) -> Self {
         self.on_error = Some(Arc::new(on_error));
         self
     }
 
-    /// 装好，交出上下文。
-    pub fn build(self, context: C) -> Console<C> {
+    /// 装好，交出应用状态。
+    pub fn build(self, state: S) -> Console<S, R> {
         let printer = self.printer.unwrap_or_default();
 
         Console {
             dispatcher: Arc::new(self.dispatcher),
-            source: Source::with_printer(context, printer.clone()),
+            source: Source::with_printer(state, printer.clone()),
             printer,
             text: self.text,
             paint: self.paint,
@@ -527,7 +587,7 @@ impl<C: Context> ConsoleBuilder<C> {
                 .unwrap_or_else(|| Box::new(reedline::FileBackedHistory::default())),
             edit_mode: self.edit_mode.unwrap_or_else(|| Box::new(Emacs::default())),
             on_error: self.on_error.unwrap_or_else(|| {
-                Arc::new(|e, source: &Source<C>| source.printer().print(e.message()))
+                Arc::new(|e, source: &Source<S, R>| source.printer().print(e.message()))
             }),
         }
     }
@@ -543,23 +603,25 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
     };
 
-    fn console() -> Console<Nothing> {
-        Console::builder()
+    struct Wrapped<T>(T);
+
+    fn console() -> Console<Nothing, i32> {
+        Console::<Nothing, i32>::builder_with_reason()
             .command(literal("quit").describe("退出").executes(
-                |ctx: &CommandContext<Source<Nothing>>| {
+                |ctx: &CommandContext<Source<Nothing, i32>>| {
                     ctx.source.request_exit(3);
                     1
                 },
             ))
             .command(
-                literal("boom").executes(|_: &CommandContext<Source<Nothing>>| -> i32 {
+                literal("boom").executes(|_: &CommandContext<Source<Nothing, i32>>| -> i32 {
                     panic!("指令体崩了");
                 }),
             )
             .build(Nothing { unlocked: true })
     }
 
-    fn run_line(console: &Console<Nothing>, line: &str) {
+    fn run_line<R: Send + 'static>(console: &Console<Nothing, R>, line: &str) {
         execute(
             &console.dispatcher,
             &console.source,
@@ -658,16 +720,34 @@ mod tests {
         assert!(matches!(console().run(), Exit::NoTerminal));
     }
 
-    /// 上下文与接受器在装好之后都还够得着。
+    /// 状态与接受器在装好之后都还够得着。
     #[test]
     fn the_console_hands_back_what_you_gave_it() {
         let console = console();
-        assert!(console.context().unlocked);
+        assert!(console.state().unlocked);
         assert!(
             console
                 .dispatcher()
                 .execute("quit", console.source())
                 .is_ok()
         );
+    }
+
+    /// Builder 接受调用方原有的共享状态，不要求为某种包装形状实现库 trait。
+    #[test]
+    fn the_builder_accepts_an_existing_arc_state() {
+        let state = StdArc::new(Nothing { unlocked: true });
+        let console: Console<StdArc<Nothing>> = Console::builder().build(StdArc::clone(&state));
+
+        assert!(StdArc::ptr_eq(console.state(), &state));
+    }
+
+    #[test]
+    fn the_builder_accepts_an_arbitrary_state_wrapper() {
+        let state = StdArc::new(Nothing { unlocked: true });
+        let console: Console<Wrapped<StdArc<Nothing>>> =
+            Console::builder().build(Wrapped(StdArc::clone(&state)));
+
+        assert!(StdArc::ptr_eq(&console.state().0, &state));
     }
 }

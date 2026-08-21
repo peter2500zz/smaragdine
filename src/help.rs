@@ -28,7 +28,9 @@ use azalea_brigadier::{
 };
 use parking_lot::RwLock;
 
-use crate::{Context, Source, Text};
+use crate::{Source, Text};
+
+type TreeNode<S, R> = Arc<RwLock<CommandNode<Source<S, R>>>>;
 
 /// 帮助里的一行。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +50,6 @@ pub struct Usage {
 /// ```
 /// # use smaragdine::prelude::*;
 /// # struct App;
-/// # impl Context for App { type Exit = i32; }
 /// # let console = Console::builder()
 /// #     .command(literal("proxy").describe("上游代理")
 /// #         .then(literal("on").describe("开").executes(|_: &CommandContext<Source<App>>| 1))
@@ -59,11 +60,15 @@ pub struct Usage {
 /// assert_eq!(rows[0].usage, "proxy off");
 /// assert_eq!(rows[0].description.as_deref(), Some("关"));
 /// ```
-pub fn usage<C: Context>(
-    tree: &CommandDispatcher<Source<C>>,
-    source: &Source<C>,
+pub fn usage<S, R>(
+    tree: &CommandDispatcher<Source<S, R>>,
+    source: &Source<S, R>,
     path: &str,
-) -> Option<Vec<Usage>> {
+) -> Option<Vec<Usage>>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let node = resolve(&tree.root, source, path)?;
 
     let mut rows: Vec<Usage> = tree
@@ -86,11 +91,11 @@ pub fn usage<C: Context>(
 }
 
 /// 顺着路径走到那个节点。
-fn resolve<C: Context>(
-    root: &Arc<RwLock<CommandNode<Source<C>>>>,
-    source: &Source<C>,
+fn resolve<S, R>(
+    root: &TreeNode<S, R>,
+    source: &Source<S, R>,
     path: &str,
-) -> Option<Arc<RwLock<CommandNode<Source<C>>>>> {
+) -> Option<TreeNode<S, R>> {
     let mut node = Arc::clone(root);
 
     for token in path.split_whitespace() {
@@ -111,21 +116,24 @@ fn resolve<C: Context>(
 /// 指令体拿得到的只有 `root_node()`，而折叠用法是 `CommandDispatcher` 上的
 /// 方法。好在它的 `root` 是公开字段，换个壳就是同一棵树 —— 不必像别处那样
 /// 重新建一棵，也不必把整个 dispatcher 塞进 source 里。
-fn shell<C: Context>(root: &Arc<RwLock<CommandNode<Source<C>>>>) -> CommandDispatcher<Source<C>> {
+fn shell<S, R>(root: &TreeNode<S, R>) -> CommandDispatcher<Source<S, R>>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let mut tree = CommandDispatcher::new();
     tree.root = Arc::clone(root);
     tree
 }
 
 /// 怎么把一层用法打出来。
-type Render<C> = Arc<dyn Fn(&Source<C>, &[Usage]) + Send + Sync>;
+type Render<S, R> = Arc<dyn Fn(&Source<S, R>, &[Usage]) + Send + Sync>;
 
 /// 帮助指令的生成器。
 ///
 /// ```
 /// # use smaragdine::prelude::*;
 /// # struct App;
-/// # impl Context for App { type Exit = i32; }
 /// # let _ =
 /// Console::<App>::builder()
 ///     .command(smaragdine::help("help").describe("显示指令帮助"))
@@ -137,7 +145,6 @@ type Render<C> = Arc<dyn Fn(&Source<C>, &[Usage]) + Send + Sync>;
 /// ```
 /// # use smaragdine::prelude::*;
 /// # struct App;
-/// # impl Context for App { type Exit = i32; }
 /// # let _ =
 /// Console::<App>::builder().command(
 ///     smaragdine::help("?")
@@ -151,18 +158,18 @@ type Render<C> = Arc<dyn Fn(&Source<C>, &[Usage]) + Send + Sync>;
 /// )
 /// # ;
 /// ```
-pub struct Help<C: Context> {
+pub struct Help<S, R = ()> {
     name: String,
     description: Option<String>,
     not_found: String,
-    render: Render<C>,
+    render: Render<S, R>,
 }
 
 /// 造一条帮助指令，名字由你定（`help`、`?`、`帮助` 都行）。
 ///
 /// 造出来的是一条普通指令，交给 `command()` 注册 —— 库不会背着你往树里塞
 /// 东西，不写这一行就没有 help。
-pub fn help<C: Context>(name: &str) -> Help<C> {
+pub fn help<S: 'static, R: 'static>(name: &str) -> Help<S, R> {
     Help {
         name: name.to_owned(),
         description: None,
@@ -172,7 +179,7 @@ pub fn help<C: Context>(name: &str) -> Help<C> {
     }
 }
 
-impl<C: Context> Help<C> {
+impl<S, R> Help<S, R> {
     /// 这条指令自己的说明，补全菜单里显示的就是它。
     pub fn describe(mut self, description: &str) -> Self {
         self.description = Some(description.to_owned());
@@ -186,14 +193,17 @@ impl<C: Context> Help<C> {
     }
 
     /// 换掉排版。默认是「用法 + 两空格 + 说明」，对齐到最长的那条用法。
-    pub fn render(mut self, render: impl Fn(&Source<C>, &[Usage]) + Send + Sync + 'static) -> Self {
+    pub fn render(
+        mut self,
+        render: impl Fn(&Source<S, R>, &[Usage]) + Send + Sync + 'static,
+    ) -> Self {
         self.render = Arc::new(render);
         self
     }
 }
 
 /// 默认排版。
-fn print_rows<C: Context>(source: &Source<C>, rows: &[Usage]) {
+fn print_rows<S, R>(source: &Source<S, R>, rows: &[Usage]) {
     let width = rows
         .iter()
         .map(|row| row.usage.chars().count())
@@ -210,8 +220,12 @@ fn print_rows<C: Context>(source: &Source<C>, rows: &[Usage]) {
     }
 }
 
-impl<C: Context> From<Help<C>> for ArgumentBuilder<Source<C>, i32> {
-    fn from(help: Help<C>) -> Self {
+impl<S, R> From<Help<S, R>> for ArgumentBuilder<Source<S, R>, i32>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    fn from(help: Help<S, R>) -> Self {
         let Help {
             name,
             description,
@@ -221,14 +235,14 @@ impl<C: Context> From<Help<C>> for ArgumentBuilder<Source<C>, i32> {
 
         let top = {
             let (render, not_found) = (Arc::clone(&render), not_found.clone());
-            move |ctx: &CommandContext<Source<C>>| {
+            move |ctx: &CommandContext<Source<S, R>>| {
                 show(ctx, "", &render, &not_found);
                 1
             }
         };
         let deeper = {
             // 最后一处用到，直接搬走。
-            move |ctx: &CommandContext<Source<C>>| {
+            move |ctx: &CommandContext<Source<S, R>>| {
                 let path = get_string(ctx, "command").unwrap_or_default();
                 show(ctx, &path, &render, &not_found);
                 1
@@ -243,18 +257,21 @@ impl<C: Context> From<Help<C>> for ArgumentBuilder<Source<C>, i32> {
         node.executes(top).then(
             // greedy：路径可以有好几段（`help proxy on`）。
             argument("command", greedy_string())
-                .suggests(suggest_path::<C>)
+                .suggests(suggest_path::<S, R>)
                 .executes(deeper),
         )
     }
 }
 
-fn show<C: Context>(
-    ctx: &CommandContext<Source<C>>,
+fn show<S, R>(
+    ctx: &CommandContext<Source<S, R>>,
     path: &str,
-    render: &Render<C>,
+    render: &Render<S, R>,
     not_found: &str,
-) {
+) where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let tree = shell(ctx.root_node());
     match usage(&tree, &ctx.source, path) {
         Some(rows) => render(&ctx.source, &rows),
@@ -266,10 +283,11 @@ fn show<C: Context>(
 ///
 /// 不给这个的话，`help pro` 一点提示都没有 —— 而树越深越需要提示，正是
 /// 帮助本身要解决的问题。
-fn suggest_path<C: Context>(
-    ctx: CommandContext<Source<C>>,
-    builder: SuggestionsBuilder,
-) -> Suggestions {
+fn suggest_path<S, R>(ctx: CommandContext<Source<S, R>>, builder: SuggestionsBuilder) -> Suggestions
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
     let typed = builder.remaining().to_owned();
     // 已经打完的那几段，与正在打的最后一段。
     let (walked, prefix) = match typed.rfind(char::is_whitespace) {
