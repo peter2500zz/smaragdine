@@ -83,7 +83,7 @@ use azalea_brigadier::{
     errors::CommandSyntaxError,
 };
 use nu_ansi_term::Style;
-use reedline::{EditMode, Emacs, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
+use reedline::{EditMode, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
 
 pub use help::{Help, Usage, help, usage};
 pub use printer::Printer;
@@ -150,6 +150,7 @@ where
     paint: Paint,
     prompt: Option<Box<dyn reedline::Prompt>>,
     indicator: String,
+    multiline_indicator: String,
     history: Box<dyn History>,
     edit_mode: Box<dyn EditMode>,
     on_error: OnError<S, R>,
@@ -237,6 +238,7 @@ where
         let prompt_line = prompt::ConsolePrompt::new(
             aside.clone(),
             self.indicator,
+            self.multiline_indicator,
             self.text.clone(),
             Arc::clone(&self.paint),
             self.prompt,
@@ -424,6 +426,7 @@ where
     paint: Paint,
     prompt: Option<Box<dyn reedline::Prompt>>,
     indicator: String,
+    multiline_indicator: String,
     history: Option<Box<dyn History>>,
     edit_mode: Option<Box<dyn EditMode>>,
     on_error: Option<OnError<S, R>>,
@@ -452,6 +455,7 @@ where
             paint: Arc::new(default_paint),
             prompt: None,
             indicator: "> ".to_owned(),
+            multiline_indicator: "| ".to_owned(),
             history: None,
             edit_mode: None,
             on_error: None,
@@ -487,6 +491,24 @@ where
     /// 换掉提示符那几个字（默认 `"> "`）。
     pub fn prompt(mut self, indicator: impl Into<String>) -> Self {
         self.indicator = indicator.into();
+        self
+    }
+
+    /// 换掉显式换行后每一行开头的提示符（默认 `"| "`）。
+    ///
+    /// 传空字符串即可不画多行提示符。若同时使用 [`Self::prompt_with`]，整个
+    /// 提示符都由自定义 [`reedline::Prompt`] 接管，这一项便不再生效。
+    ///
+    /// ```
+    /// # use smaragdine::Console;
+    /// # struct App;
+    /// let console = Console::builder()
+    ///     .multiline_prompt("... ")
+    ///     .build(App);
+    /// # let _ = console;
+    /// ```
+    pub fn multiline_prompt(mut self, indicator: impl Into<String>) -> Self {
+        self.multiline_indicator = indicator.into();
         self
     }
 
@@ -534,7 +556,10 @@ where
         self
     }
 
-    /// 换掉底层键位表（默认 emacs）。
+    /// 换掉底层键位表。
+    ///
+    /// 默认以 reedline 的 Emacs 键位为底，但不启用 Ctrl-L/R/O/B/F/P/N。显式
+    /// 交进来的编辑模式不受这项默认策略限制。
     ///
     /// 补全弹窗独占的那几个键（↑↓ / Tab / Shift+Tab / Esc / 回车）仍由库
     /// 接管 —— 弹窗不要的键才轮到这一层。
@@ -582,10 +607,13 @@ where
             paint: self.paint,
             prompt: self.prompt,
             indicator: self.indicator,
+            multiline_indicator: self.multiline_indicator,
             history: self
                 .history
                 .unwrap_or_else(|| Box::new(reedline::FileBackedHistory::default())),
-            edit_mode: self.edit_mode.unwrap_or_else(|| Box::new(Emacs::default())),
+            edit_mode: self
+                .edit_mode
+                .unwrap_or_else(|| Box::new(keys::default_edit_mode())),
             on_error: self.on_error.unwrap_or_else(|| {
                 Arc::new(|e, source: &Source<S, R>| source.printer().print(e.message()))
             }),

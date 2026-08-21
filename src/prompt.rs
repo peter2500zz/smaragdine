@@ -49,6 +49,7 @@ impl Aside {
 pub(crate) struct ConsolePrompt {
     aside: Aside,
     indicator: String,
+    multiline_indicator: String,
     text: Text,
     paint: Paint,
     inner: Option<Box<dyn Prompt>>,
@@ -58,6 +59,7 @@ impl ConsolePrompt {
     pub(crate) fn new(
         aside: Aside,
         indicator: String,
+        multiline_indicator: String,
         text: Text,
         paint: Paint,
         inner: Option<Box<dyn Prompt>>,
@@ -65,6 +67,7 @@ impl ConsolePrompt {
         Self {
             aside,
             indicator,
+            multiline_indicator,
             text,
             paint,
             inner,
@@ -103,7 +106,7 @@ impl Prompt for ConsolePrompt {
     fn render_prompt_multiline_indicator(&self) -> Cow<'_, str> {
         match &self.inner {
             Some(inner) => inner.render_prompt_multiline_indicator(),
-            None => Cow::Borrowed("| "),
+            None => Cow::Borrowed(&self.multiline_indicator),
         }
     }
 
@@ -141,10 +144,32 @@ mod tests {
         ConsolePrompt::new(
             Aside::new(),
             "> ".to_owned(),
+            "| ".to_owned(),
             Text::default(),
             Arc::new(default_paint),
             inner,
         )
+    }
+
+    #[test]
+    fn the_multiline_indicator_is_configurable_or_hideable() {
+        for indicator in ["... ", ""] {
+            let prompt = ConsolePrompt::new(
+                Aside::new(),
+                "> ".to_owned(),
+                indicator.to_owned(),
+                Text::default(),
+                Arc::new(default_paint),
+                None,
+            );
+
+            assert_eq!(prompt.render_prompt_multiline_indicator(), indicator);
+        }
+    }
+
+    #[test]
+    fn the_default_multiline_indicator_stays_the_same() {
+        assert_eq!(prompt(None).render_prompt_multiline_indicator(), "| ");
     }
 
     /// 右侧那一句由高亮器填，提示行照原样读出来。
@@ -171,6 +196,7 @@ mod tests {
         let prompt = ConsolePrompt::new(
             Aside::new(),
             "> ".to_owned(),
+            "| ".to_owned(),
             Text {
                 history_search: "回溯".to_owned(),
                 history_search_failing: "没找到 ".to_owned(),

@@ -65,6 +65,8 @@ fn main() {
             ..Text::default()
         })
         .prompt("demo> ")
+        // 粘贴或 Shift+Enter 产生显式换行时，每个后续行从这里开始。
+        .multiline_prompt("... ")
         // 指令没跑成时的措辞。brigadier 的错误是结构化的，想换哪句换哪句。
         .on_error(|err, source| {
             use smaragdine::brigadier::errors::BuiltInError;

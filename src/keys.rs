@@ -30,13 +30,30 @@ use reedline::{EditCommand, EditMode, PromptEditMode, ReedlineEvent, ReedlineRaw
 
 use crate::menu::{MenuCursor, MenuVisible};
 
+/// 默认控制台不继承这些与 Minecraft 文本框无关的 Emacs/终端快捷键。
+///
+/// 这里只收紧库提供的默认值；调用方经 `ConsoleBuilder::edit_mode` 显式交进来的
+/// 编辑模式一律照原样使用。
+const DISABLED_CONTROL_CHARS: [char; 7] = ['l', 'r', 'o', 'b', 'f', 'p', 'n'];
+
+pub(crate) fn default_edit_mode() -> reedline::Emacs {
+    let mut bindings = reedline::default_emacs_keybindings();
+
+    for key in DISABLED_CONTROL_CHARS {
+        let removed = bindings.remove_binding(KeyModifiers::CONTROL, KeyCode::Char(key));
+        debug_assert!(removed.is_some(), "reedline 不再默认绑定 Ctrl-{key}");
+    }
+
+    reedline::Emacs::new(bindings)
+}
+
 /// 控制台的按键分派。
 pub(crate) struct ConsoleEditMode {
     /// 弹窗不要的键交给它 —— 相当于输入行本体。
     ///
-    /// 默认是 reedline 的 emacs 键位，一处不改：Ctrl-A/E/W/K 之类的编辑键与
-    /// 弹窗无关，本来就该照惯例走。想换 Vi 或自定义键位，整个换掉它即可 ——
-    /// 需要按状态分派的那几个键在 `route` 里先拦掉了，轮不到这一层。
+    /// 默认以 reedline 的 Emacs 键位为底，只摘掉 Ctrl-L/R/O/B/F/P/N；想换 Vi
+    /// 或自定义键位，整个换掉它即可。需要按状态分派的那几个键在 `route` 里
+    /// 先拦掉了，轮不到这一层。
     inner: Box<dyn EditMode>,
     /// 补全菜单此刻画没画出来。
     menu_visible: MenuVisible,
@@ -310,7 +327,7 @@ mod tests {
             MENU,
             visible,
             MenuCursor::new(),
-            Box::new(reedline::Emacs::default()),
+            Box::new(default_edit_mode()),
         )
     }
 
@@ -328,6 +345,75 @@ mod tests {
         let raw = ReedlineRawEvent::try_from(Event::Key(KeyEvent::new(code, modifiers)))
             .expect("按下事件不该被拒");
         reedline::Emacs::default().parse_event(raw)
+    }
+
+    fn edit_event(
+        mode: &mut dyn EditMode,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> ReedlineEvent {
+        let raw = ReedlineRawEvent::try_from(Event::Key(KeyEvent::new(code, modifiers)))
+            .expect("按下事件不该被拒");
+        mode.parse_event(raw)
+    }
+
+    #[test]
+    fn the_default_mode_disables_only_the_selected_control_bindings() {
+        let mut keys: Vec<_> = ('a'..='z').map(KeyCode::Char).collect();
+        keys.extend([
+            KeyCode::Left,
+            KeyCode::Right,
+            KeyCode::Up,
+            KeyCode::Down,
+            KeyCode::Home,
+            KeyCode::End,
+            KeyCode::Backspace,
+            KeyCode::Delete,
+            KeyCode::Enter,
+            KeyCode::Tab,
+        ]);
+
+        for modifiers in [
+            KeyModifiers::CONTROL,
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+            KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SHIFT,
+        ] {
+            for code in &keys {
+                let mut reedline = reedline::Emacs::default();
+                let mut console = default_edit_mode();
+                let expected = edit_event(&mut reedline, *code, modifiers);
+                let actual = edit_event(&mut console, *code, modifiers);
+                let disabled = modifiers == KeyModifiers::CONTROL
+                    && matches!(code, KeyCode::Char(key) if DISABLED_CONTROL_CHARS.contains(key));
+
+                if disabled {
+                    assert_ne!(expected, ReedlineEvent::None, "Ctrl-{code:?} 基线应有绑定");
+                    assert_eq!(actual, ReedlineEvent::None, "Ctrl-{code:?} 应被禁用");
+                } else {
+                    assert_eq!(
+                        actual, expected,
+                        "Ctrl 组合 {modifiers:?}+{code:?} 不该改变"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_custom_edit_mode_keeps_its_own_control_bindings() {
+        let visible = MenuVisible::new();
+        let mut mode = ConsoleEditMode::new(
+            MENU,
+            visible,
+            MenuCursor::new(),
+            Box::new(reedline::Emacs::default()),
+        );
+
+        assert_eq!(
+            press(&mut mode, KeyCode::Char('l'), KeyModifiers::CONTROL),
+            ReedlineEvent::ClearScreen
+        );
     }
 
     /// 弹窗可见时 ↑↓ 归弹窗。

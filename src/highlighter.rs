@@ -349,7 +349,14 @@ mod tests {
     #[test]
     fn final_highlight_drops_ghost_text_and_the_aside() {
         let (highlighter, aside, shadow) = highlighter();
-        let prompt = ConsolePrompt::new(aside, "> ".to_owned(), Text::default(), paint(), None);
+        let prompt = ConsolePrompt::new(
+            aside,
+            "> ".to_owned(),
+            "| ".to_owned(),
+            Text::default(),
+            paint(),
+            None,
+        );
 
         assert_eq!(highlighter.highlight("ec", 2).raw_string(), "echo");
         let _ = highlighter.highlight("echo ", 5);
