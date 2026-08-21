@@ -125,9 +125,9 @@ pub struct HidingMenu {
 }
 
 impl HidingMenu {
-    pub fn new(name: &str, visible: MenuVisible) -> Self {
+    pub fn new(name: &str, indicator: &str, visible: MenuVisible) -> Self {
         Self {
-            inner: IdeMenu::default().with_name(name),
+            inner: IdeMenu::default().with_name(name).with_marker(indicator),
             visible,
         }
     }
@@ -299,14 +299,26 @@ mod tests {
     use super::*;
 
     fn menu(name: &str) -> (HidingMenu, MenuVisible) {
+        menu_with_indicator(name, "| ")
+    }
+
+    fn menu_with_indicator(name: &str, indicator: &str) -> (HidingMenu, MenuVisible) {
         let visible = MenuVisible::new();
-        (HidingMenu::new(name, visible.clone()), visible)
+        (HidingMenu::new(name, indicator, visible.clone()), visible)
     }
 
     #[test]
     fn the_name_survives_the_wrapper() {
         let (menu, _) = menu("completion_menu");
         assert_eq!(menu.name(), "completion_menu");
+    }
+
+    #[test]
+    fn the_indicator_survives_the_wrapper() {
+        for indicator in ["/ ", ""] {
+            let (menu, _) = menu_with_indicator("m", indicator);
+            assert_eq!(menu.indicator(), indicator);
+        }
     }
 
     /// 没激活时本来就不该显示。

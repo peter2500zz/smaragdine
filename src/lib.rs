@@ -150,6 +150,7 @@ where
     paint: Paint,
     prompt: Option<Box<dyn reedline::Prompt>>,
     indicator: String,
+    completion_indicator: String,
     multiline_indicator: String,
     history: Box<dyn History>,
     edit_mode: Box<dyn EditMode>,
@@ -264,7 +265,7 @@ where
                 Arc::clone(&self.paint),
             )))
             .with_menu(ReedlineMenu::EngineCompleter(Box::new(
-                menu::HidingMenu::new(MENU_NAME, visible.clone()),
+                menu::HidingMenu::new(MENU_NAME, &self.completion_indicator, visible.clone()),
             )))
             // 历史不做前缀过滤，↑↓ 才是纯索引走位（见 history 模块）。
             .with_history(Box::new(history::ConsoleHistory::new(self.history)))
@@ -426,6 +427,7 @@ where
     paint: Paint,
     prompt: Option<Box<dyn reedline::Prompt>>,
     indicator: String,
+    completion_indicator: String,
     multiline_indicator: String,
     history: Option<Box<dyn History>>,
     edit_mode: Option<Box<dyn EditMode>>,
@@ -455,6 +457,7 @@ where
             paint: Arc::new(default_paint),
             prompt: None,
             indicator: "> ".to_owned(),
+            completion_indicator: "| ".to_owned(),
             multiline_indicator: "| ".to_owned(),
             history: None,
             edit_mode: None,
@@ -491,6 +494,25 @@ where
     /// 换掉提示符那几个字（默认 `"> "`）。
     pub fn prompt(mut self, indicator: impl Into<String>) -> Self {
         self.indicator = indicator.into();
+        self
+    }
+
+    /// 换掉补全菜单可见时临时顶替主提示符的符号（默认 `"| "`）。
+    ///
+    /// 它与 [`Self::multiline_prompt`] 是两处独立的提示符：前者跟着补全菜单
+    /// 显示，后者只出现在输入缓冲区的显式换行之后。传空字符串即可让补全
+    /// 菜单显示时不画这个符号。
+    ///
+    /// ```
+    /// # use smaragdine::Console;
+    /// # struct App;
+    /// let console = Console::builder()
+    ///     .completion_prompt("/ ")
+    ///     .build(App);
+    /// # let _ = console;
+    /// ```
+    pub fn completion_prompt(mut self, indicator: impl Into<String>) -> Self {
+        self.completion_indicator = indicator.into();
         self
     }
 
@@ -607,6 +629,7 @@ where
             paint: self.paint,
             prompt: self.prompt,
             indicator: self.indicator,
+            completion_indicator: self.completion_indicator,
             multiline_indicator: self.multiline_indicator,
             history: self
                 .history
@@ -777,5 +800,19 @@ mod tests {
             Console::builder().build(Wrapped(StdArc::clone(&state)));
 
         assert!(StdArc::ptr_eq(&console.state().0, &state));
+    }
+
+    #[test]
+    fn completion_and_multiline_prompts_are_independent() {
+        let defaults = Console::builder().build(Nothing { unlocked: true });
+        assert_eq!(defaults.completion_indicator, "| ");
+        assert_eq!(defaults.multiline_indicator, "| ");
+
+        let configured = Console::builder()
+            .completion_prompt("menu> ")
+            .multiline_prompt("line> ")
+            .build(Nothing { unlocked: true });
+        assert_eq!(configured.completion_indicator, "menu> ");
+        assert_eq!(configured.multiline_indicator, "line> ");
     }
 }
