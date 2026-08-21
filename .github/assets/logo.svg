@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 1024" fill="currentColor" aria-hidden="true">
+  <defs>
+    <mask id="cutout">
+
+      <rect x="0" y="0" width="700" height="1024" rx="100" fill="white" />
+      <path d="
+          M 100 0
+          H 620
+          C 630.2 0, 665 44.8, 668 100
+          V 899
+          C 675 944.2, 630.2 989, 575 989
+          H 100
+          C 44.8 989, 0 954.2, 0 925
+          V 100
+          C 0 44.8, 44.8 0, 100 0
+          Z
+        " fill="black" />
+
+    </mask>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="50%" y2="100%">
+
+      <stop offset="0%" stop-color="#37A167" />
+      <stop offset="25%" stop-color="#2B965F" />
+      <stop offset="100%" stop-color="#24915B" />
+
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="700" height="1024" rx="100" fill="url(#bgGradient)" />
+  <rect x="0" y="0" width="700" height="1024" rx="100" fill="#056748" mask="url(#cutout)" />
+  <rect x="32" y="32" width="636" height="960" rx="67" fill="#077957" />
+  <rect x="110" y="132" width="476" height="40" rx="20" fill="#6CC581" />
+
+  <rect x="110" y="236" width="220" height="40" rx="20" fill="#6CC581" />
+  <rect x="362" y="236" width="72" height="40" rx="20" fill="#6CC581" />
+
+  <rect x="110" y="340" width="400" height="40" rx="20" fill="#6CC581" />
+
+  <rect x="110" y="444" width="236" height="40" rx="20" fill="#6CC581" />
+
+  <rect x="110" y="548" width="476" height="40" rx="20" fill="#6CC581" />
+
+  <rect x="110" y="652" width="214" height="40" rx="20" fill="#6CC581" />
+
+  <rect x="110" y="762" width="136" height="40" rx="20" fill="#6CC581" transform="rotate(30 130 782)" />
+  <rect x="110" y="862" width="136" height="40" rx="20" fill="#6CC581" transform="rotate(-30 130 882)" />
+
+  <rect x="242" y="864" width="100" height="40" rx="20" fill="#6CC581" />
+</svg>

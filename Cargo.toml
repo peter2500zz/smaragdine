@@ -1,6 +1,6 @@
 [package]
 name = "smaragdine"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 rust-version = "1.95"
 description = "把 brigadier 指令树变成一个带补全、语法高亮与历史的交互式控制台"
