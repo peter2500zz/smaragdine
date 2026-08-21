@@ -8,7 +8,7 @@
 //! |----|---------|---------|
 //! | ↑ / ↓ | 上下移动选中项 | 翻历史 |
 //! | Tab | 采用选中项，再按则原地换下一条 | 打开弹窗 |
-//! | Shift+Tab | 同上，反向 | 无 |
+//! | Shift+Tab | 同上，反向 | 打开弹窗 |
 //! | 光标移动 | 收起弹窗，再按编辑模式原义移动 | 按编辑模式原义移动 |
 //! | Esc | 收起弹窗 | 清除选区 |
 //! | Enter | 执行本行 | 执行本行 |
@@ -106,17 +106,16 @@ impl ConsoleEditMode {
             // 源头解决了，这里不必也不该再打补丁。
             (KeyCode::Up, KeyModifiers::NONE) => self.dismiss_then(ReedlineEvent::PreviousHistory),
             (KeyCode::Down, KeyModifiers::NONE) => self.dismiss_then(ReedlineEvent::NextHistory),
-            // 弹窗关着时 Tab 把它打开。菜单已激活时这是空操作
+            // 弹窗关着时 Tab 或 Shift+Tab 都把它打开；第一次只负责打开，
+            // 方向要等菜单已经可见后才有意义。菜单已激活时这是空操作
             // （`handle_editor_event` 的 `Menu` 分支：`if self.active_menu().is_none()`），
             // 与「没有候选就没有弹窗」一致。
-            (KeyCode::Tab, KeyModifiers::NONE) => {
+            (KeyCode::Tab, KeyModifiers::NONE) | (KeyCode::BackTab, _) => {
                 // 新弹窗从「还没采用过」开始：循环状态随弹窗一起新建。
                 self.tab_cycles = false;
                 self.cursor.reset();
                 ReedlineEvent::Menu(self.menu_name.clone())
             }
-            // 弹窗都没开，反向切没有意义。
-            (KeyCode::BackTab, _) => ReedlineEvent::None,
 
             // isEscape → hide()。菜单没开时这一下只是清掉选区，无害。
             (KeyCode::Esc, KeyModifiers::NONE) => {
@@ -425,14 +424,16 @@ mod tests {
         );
     }
 
-    /// 弹窗关着时 Tab 把它打开，Shift+Tab 无事可做。
+    /// 弹窗关着时 Tab 与 Shift+Tab 都把它打开。
     #[test]
-    fn tab_opens_a_hidden_menu_and_back_tab_does_nothing() {
+    fn tab_and_back_tab_open_a_hidden_menu() {
+        let menu = ReedlineEvent::Menu(MENU.to_owned());
+        assert_eq!(tap(&mut mode(false), KeyCode::Tab), menu);
+        assert_eq!(tap(&mut mode(false), KeyCode::BackTab), menu);
         assert_eq!(
-            tap(&mut mode(false), KeyCode::Tab),
-            ReedlineEvent::Menu(MENU.to_owned())
+            press(&mut mode(false), KeyCode::BackTab, KeyModifiers::SHIFT),
+            menu
         );
-        assert_eq!(tap(&mut mode(false), KeyCode::BackTab), ReedlineEvent::None);
     }
 
     /// Esc 收起弹窗。
