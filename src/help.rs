@@ -350,6 +350,25 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "async")]
+    #[test]
+    fn async_only_commands_are_listed() {
+        let mut dispatcher = CommandDispatcher::new();
+        dispatcher.register(
+            literal("later")
+                .describe("异步执行")
+                .executes_async(|_: &CommandContext<Source<Nothing>>| async { 1 }),
+        );
+
+        assert_eq!(
+            usage(&dispatcher, &source(), ""),
+            Some(vec![Usage {
+                usage: "later".to_owned(),
+                description: Some("异步执行".to_owned()),
+            }])
+        );
+    }
+
     /// 往下钻一层，路径会补在前面。
     #[test]
     fn drilling_down_keeps_the_path() {

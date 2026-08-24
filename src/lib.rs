@@ -59,6 +59,8 @@
 //! * **`requires` 在每一次击键时都会跑**，且拿得到真实状态 —— 只该读廉价
 //!   状态，见 [`Source::state`]。
 
+#[cfg(feature = "async")]
+mod asynchronous;
 mod completer;
 mod help;
 mod highlighter;
@@ -85,6 +87,8 @@ use azalea_brigadier::{
 use nu_ansi_term::Style;
 use reedline::{EditMode, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
 
+#[cfg(feature = "async")]
+pub use asynchronous::{AsyncConsole, AsyncConsoleBuilder};
 pub use help::{Help, Usage, help, usage};
 pub use printer::Printer;
 pub use source::Source;
@@ -96,9 +100,13 @@ pub use theme::{Paint, Piece, Token, default_paint};
 pub use azalea_brigadier as brigadier;
 pub use nu_ansi_term;
 pub use reedline;
+#[cfg(feature = "async")]
+pub use tokio;
 
 /// 常用的那些东西，外加 brigadier 的建树函数。
 pub mod prelude {
+    #[cfg(feature = "async")]
+    pub use crate::{AsyncConsole, AsyncConsoleBuilder};
     pub use crate::{
         Console, ConsoleBuilder, Exit, Help, Paint, Piece, Printer, Source, Text, Token, Usage,
     };
@@ -216,6 +224,19 @@ where
     /// 返回前恢复成直接写 stdout —— 否则关停阶段的输出会写进一个没人再读的
     /// 通道里。
     pub fn run(self) -> Exit<R> {
+        self.run_with(dispatch::<S, R>)
+    }
+
+    fn run_with(
+        self,
+        dispatch_line: impl Fn(
+            &Arc<CommandDispatcher<Source<S, R>>>,
+            &Source<S, R>,
+            &OnError<S, R>,
+            &Text,
+            &str,
+        ),
+    ) -> Exit<R> {
         // 后台运行、输出被重定向、容器里没分配 tty —— 这些场景下没有可交互
         // 的终端。必须提前判掉，理由见 Exit::NoTerminal。
         if !std::io::stdin().is_terminal() {
@@ -285,7 +306,7 @@ where
                 Ok(Signal::Success(line)) => {
                     armed.disarm();
                     if !line.trim().is_empty() {
-                        dispatch(
+                        dispatch_line(
                             &self.dispatcher,
                             &self.source,
                             &self.on_error,

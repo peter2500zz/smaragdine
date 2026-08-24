@@ -187,7 +187,18 @@ fn examples_of<S, R>(node: &CommandNode<Source<S, R>>) -> Option<String> {
 ///
 /// 重定向与子指令会把上下文串成一条链，只看最外层会漏掉后半截。
 fn is_runnable<S, R>(context: &CommandContextBuilder<'_, Source<S, R>, i32>) -> bool {
-    context.command.is_some() || context.child.as_deref().is_some_and(is_runnable)
+    context_has_command(context) || context.child.as_deref().is_some_and(is_runnable)
+}
+
+fn context_has_command<S, R>(context: &CommandContextBuilder<'_, Source<S, R>, i32>) -> bool {
+    #[cfg(feature = "async")]
+    {
+        context.command.is_some() || context.async_command.is_some()
+    }
+    #[cfg(not(feature = "async"))]
+    {
+        context.command.is_some()
+    }
 }
 
 #[cfg(test)]
@@ -198,6 +209,30 @@ mod tests {
     fn look(line: &str) -> Inspection {
         let (dispatcher, source) = (dispatcher(), source());
         inspect(&dispatcher, &source, &Text::default(), line, line.len())
+    }
+
+    #[cfg(feature = "async")]
+    #[test]
+    fn an_async_command_is_runnable() {
+        use azalea_brigadier::prelude::*;
+
+        let mut dispatcher = CommandDispatcher::new();
+        dispatcher.register(
+            literal("later")
+                .executes_async(|_: &CommandContext<Source<crate::testing::Nothing>>| async { 1 }),
+        );
+        let source = source();
+
+        assert_eq!(
+            inspect(
+                &dispatcher,
+                &source,
+                &Text::default(),
+                "later",
+                "later".len(),
+            ),
+            Inspection::default()
+        );
     }
 
     /// 该填参数时给出占位，右侧说明这个参数是什么 —— 说明取自节点。
