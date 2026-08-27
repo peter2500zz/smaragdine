@@ -8,6 +8,13 @@ license = "Apache-2.0"
 readme = false
 publish = false
 
+[features]
+default = []
+async = ["dep:tokio", "azalea-brigadier/async"]
+# 只给仓库内示例补齐 runtime 驱动；普通 `async` 用户不被迫带计时器或
+# 多线程调度器，按自己的应用选择 Tokio feature。
+async-demo = ["async", "tokio/rt-multi-thread", "tokio/time"]
+
 [dependencies]
 # ── 指令树 ──
 # 用 fork 而非 crates.io，两处改动都非它不可：
@@ -15,8 +22,10 @@ publish = false
 #   （见 fix/utf8-cursor）；
 # * 字面量节点没处存说明，补全菜单只能另建一张按名字查的表 —— 于是全树的
 #   字面量名被迫唯一，`proxy on` 与 `log on` 不能共存。本分支给节点加了
-#   describe()，说明随 Suggestion 的 tooltip 一起流出来。
-azalea-brigadier = { git = "https://github.com/peter2500zz/azalea", branch = "smaragdine" }
+#   describe()，说明随 Suggestion 的 tooltip 一起流出来；
+# * 可选的 async action 先生成不含解析上下文的 Send 执行计划，供 Tokio task
+#   使用，同时保持同步 dispatcher 的行为不变。
+azalea-brigadier = { git = "https://github.com/peter2500zz/azalea", branch = "feature/async-brigadier" }
 
 # ── 行编辑 ──
 # 同样用 fork：原版补全弹窗的 Tab 是「原地循环」——反复按 Tab 在同一位置换入
@@ -36,6 +45,14 @@ nu-ansi-term = "0.50"
 # 想给指令树里的节点起个名字就绕不开它。版本必须与 brigadier 用的那个大版本
 # 一致，否则会是两个互不相认的类型。
 parking_lot = "0.12"
+
+# 仅异步控制台需要。库只持有调用方 runtime 的 Handle 并投递 task，不创建
+# runtime；因此核心只开 `rt`，计时器、网络、多线程调度器都由使用方按需启用。
+tokio = { version = "1", optional = true, default-features = false, features = ["rt"] }
+
+[[example]]
+name = "async_demo"
+required-features = ["async-demo"]
 
 # 注意：使用方不要设 panic = "abort" —— 控制台依赖 catch_unwind 兜住指令体与
 # 解析器的 panic，一条指令写崩了不该把整个程序带走。

@@ -20,7 +20,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "azalea-brigadier"
 version = "0.16.0+mc26.2"
-source = "git+https://github.com/peter2500zz/azalea?branch=smaragdine#0fc01a861d91f855584d613db4c8849ed94278fd"
+source = "git+https://github.com/peter2500zz/azalea?branch=feature%2Fasync-brigadier#0fe189f3e02993be63826f9c26da9b78641b365b"
 dependencies = [
  "parking_lot",
 ]
@@ -585,6 +585,7 @@ dependencies = [
  "nu-ansi-term",
  "parking_lot",
  "reedline",
+ "tokio",
 ]
 
 [[package]]
@@ -657,6 +658,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.3",
+]
+
+[[package]]
+name = "tokio"
+version = "1.53.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+dependencies = [
+ "pin-project-lite",
 ]
 
 [[package]]
