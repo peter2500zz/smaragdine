@@ -84,10 +84,8 @@ where
                         span: Span::new(suggestion.range.start(), suggestion.range.end()),
                         value: suggestion.text(),
                         // 不补空格：采用候选只该做区间替换、不追加任何东西。
-                        // 补了反而会把指令打废 —— brigadier 下探子节点前要求
-                        // 至少还剩两个字符（分隔符 + 下一 token 的首字符，见
-                        // command_dispatcher.rs 的 can_read_length(2)），只剩
-                        // 一个尾随空格时这一步不成立，"stop " 便解析失败。
+                        // 终端分隔空格由 dispatcher 自己处理；这里追加空格会
+                        // 改变可选子节点的解析位置，而且没有必要。
                         // 默认就是 false，写出来是因为这件事要紧。
                         append_whitespace: false,
                         ..Default::default()
@@ -170,7 +168,7 @@ fn exact_literal_match<S, R>(
         description,
         span: Span::new(start, pos),
         value: typed.to_owned(),
-        // 与上面同理：补空格会让 "stop " 这类整行解析失败。
+        // 与上面同理：终端分隔空格由 dispatcher 处理，候选本身不追加。
         append_whitespace: false,
         ..Default::default()
     })
@@ -239,12 +237,8 @@ mod tests {
         assert!(suggestions("zzz").is_empty());
     }
 
-    /// 补全绝不能补尾随空格，否则补出来的指令根本执行不了。
-    ///
-    /// brigadier 下探子节点前要求至少还剩两个字符（分隔符 + 下一 token 的首
-    /// 字符，见 command_dispatcher.rs 的 `can_read_length(2)`）。只剩一个尾随
-    /// 空格时这一步不成立，解析停在字面量之后并留下未消费的字符，
-    /// `execute_parsed` 便报「Incorrect argument for command」。
+    /// 补全不应替候选追加空格。终端分隔空格本身是合法的，
+    /// 但候选只负责替换当前跨度；追加空格会改变下一次解析的位置。
     #[test]
     fn completions_never_append_whitespace() {
         for line in ["ec", "e", "qu", "qui"] {
@@ -257,13 +251,29 @@ mod tests {
             }
         }
 
-        // 直接核对补全出来的整行确实能执行。
+        // 直接核对带终端分隔空格的整行确实能执行。
         let (dispatcher, source) = (dispatcher(), source());
         assert!(dispatcher.execute("quit", source.clone()).is_ok());
-        assert!(
-            dispatcher.execute("quit ", source).is_err(),
-            "尾随空格会让指令失效 —— 这正是不能补空格的原因"
+        assert!(dispatcher.execute("quit ", source.clone()).is_ok());
+        assert!(dispatcher.execute("quit  ", source).is_ok());
+    }
+
+    #[test]
+    fn optional_arguments_ignore_terminal_spaces() {
+        let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
+        tree.register(
+            literal("kick").then(
+                argument("player", word())
+                    .executes(|_| 1)
+                    .then(argument("reason", greedy_string()).executes(|_| 2)),
+            ),
         );
+        let source = source();
+
+        for line in ["kick Bob", "kick Bob ", "kick Bob  ", "kick Bob   "] {
+            assert_eq!(tree.execute(line, source.clone()).unwrap(), 1, "{line:?}");
+        }
+        assert_eq!(tree.execute("kick Bob reason", source).unwrap(), 2);
     }
 
     /// 指令名打全之后，自身与同前缀的更长指令都要列出来。

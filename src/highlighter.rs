@@ -423,6 +423,20 @@ mod tests {
     }
 
     #[test]
+    fn terminal_spaces_are_not_marked_as_unparsed() {
+        let line = "quit  ";
+        let coloured = styled_line(&dispatcher(), &source(), &paint(), line);
+
+        assert_roundtrips(line);
+        assert!(
+            coloured.buffer.iter().all(|(style, text)| {
+                text.trim().is_empty() || style.foreground != colour(Piece::Unparsed, 0)
+            }),
+            "terminal spaces on an executable command should be valid"
+        );
+    }
+
+    #[test]
     fn an_empty_line_produces_nothing_to_paint() {
         assert!(spans("").is_empty());
     }
