@@ -791,10 +791,7 @@ mod tests {
         let console = Console::builder()
             .command(literal("fail").executes_result(
                 |_: &CommandContext<Source<Nothing>>| -> Result<i32, std::io::Error> {
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "command failed",
-                    ))
+                    Err(std::io::Error::other("command failed"))
                 },
             ))
             .on_error({
