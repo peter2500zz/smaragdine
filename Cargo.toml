@@ -25,7 +25,7 @@ async-demo = ["async", "tokio/rt-multi-thread", "tokio/time"]
 #   describe()，说明随 Suggestion 的 tooltip 一起流出来；
 # * 可选的 async action 先生成不含解析上下文的 Send 执行计划，供 Tokio task
 #   使用，同时保持同步 dispatcher 的行为不变。
-azalea-brigadier = { git = "https://github.com/peter2500zz/azalea", branch = "fix/terminal-whitespace" }
+azalea-brigadier = { git = "https://github.com/peter2500zz/azalea", branch = "smaragdine" }
 
 # ── 行编辑 ──
 # 同样用 fork：原版补全弹窗的 Tab 是「原地循环」——反复按 Tab 在同一位置换入
