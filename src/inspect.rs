@@ -318,6 +318,8 @@ mod tests {
     #[test]
     fn a_runnable_line_is_not_an_error() {
         assert_eq!(look("quit").aside, None, "quit 没有参数，右侧该空着");
+        assert_eq!(look("quit ").aside, None, "终端一个空格不该报错");
+        assert_eq!(look("quit  ").aside, None, "终端多个空格也不该报错");
         assert!(!is_failure(&look("echo hi")));
         assert_eq!(look("echo hi").aside, None, "参数已经打了字，右侧也该空着");
     }
