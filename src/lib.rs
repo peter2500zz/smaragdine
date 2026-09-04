@@ -82,7 +82,7 @@ use std::{io::IsTerminal, sync::Arc};
 
 use azalea_brigadier::{
     builder::argument_builder::ArgumentBuilder, command_dispatcher::CommandDispatcher,
-    errors::CommandSyntaxError,
+    errors::CommandError,
 };
 use nu_ansi_term::Style;
 use reedline::{EditMode, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
@@ -143,7 +143,7 @@ pub enum Exit<R = ()> {
 }
 
 /// 指令没跑成时怎么说。
-type OnError<S, R> = Arc<dyn Fn(&CommandSyntaxError, &Source<S, R>) + Send + Sync>;
+type OnError<S, R> = Arc<dyn Fn(&CommandError, &Source<S, R>) + Send + Sync>;
 
 /// 一个装好了的控制台。
 pub struct Console<S, R = ()>
@@ -613,8 +613,9 @@ where
 
     /// 指令没跑成时怎么说。
     ///
-    /// 默认把 brigadier 的英文原文打出来。它是结构化的 —— `err.kind()` 是
-    /// 带值的枚举 —— 所以想换措辞、换语言、或者干脆记进日志，都在这里做：
+    /// 默认把 brigadier 的英文原文打出来。语法错误仍可通过
+    /// `err.syntax().map(|syntax| syntax.kind())` 取得带值的枚举，所以想换措辞、
+    /// 换语言、或者干脆记进日志，都在这里做：
     ///
     /// ```
     /// # use smaragdine::prelude::*;
@@ -623,8 +624,8 @@ where
     ///
     /// let console = Console::<App>::builder()
     ///     .on_error(|err, source| {
-    ///         source.printer().print(match err.kind() {
-    ///             BuiltInError::DispatcherUnknownCommand => "不认识的指令".to_owned(),
+    ///         source.printer().print(match err.syntax().map(|syntax| syntax.kind()) {
+    ///             Some(BuiltInError::DispatcherUnknownCommand) => "不认识的指令".to_owned(),
     ///             _ => err.message(),
     ///         });
     ///     })
@@ -632,7 +633,7 @@ where
     /// ```
     pub fn on_error(
         mut self,
-        on_error: impl Fn(&CommandSyntaxError, &Source<S, R>) + Send + Sync + 'static,
+        on_error: impl Fn(&CommandError, &Source<S, R>) + Send + Sync + 'static,
     ) -> Self {
         self.on_error = Some(Arc::new(on_error));
         self
@@ -782,6 +783,33 @@ mod tests {
 
         run_line(&console, "quit");
         assert_eq!(seen.load(Ordering::Relaxed), 1, "跑成了就不该报错");
+    }
+
+    #[test]
+    fn the_error_hook_gets_execution_errors() {
+        let seen = StdArc::new(AtomicUsize::new(0));
+        let console = Console::builder()
+            .command(literal("fail").executes_result(
+                |_: &CommandContext<Source<Nothing>>| -> Result<i32, std::io::Error> {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "command failed",
+                    ))
+                },
+            ))
+            .on_error({
+                let seen = StdArc::clone(&seen);
+                move |err, _| {
+                    seen.fetch_add(1, Ordering::Relaxed);
+                    assert!(err.execution().is_some());
+                    assert!(err.syntax().is_none());
+                    assert_eq!(err.to_string(), "command failed");
+                }
+            })
+            .build(Nothing { unlocked: true });
+
+        run_line(&console, "fail");
+        assert_eq!(seen.load(Ordering::Relaxed), 1);
     }
 
     /// 没有终端时不能当成「用户退出」—— 否则程序会在启动瞬间自己关掉。

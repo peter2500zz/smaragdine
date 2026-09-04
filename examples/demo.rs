@@ -71,12 +71,14 @@ fn main() {
         .on_error(|err, source| {
             use smaragdine::brigadier::errors::BuiltInError;
 
-            source.printer().print(match err.kind() {
-                BuiltInError::DispatcherUnknownCommand => {
-                    "没有这条指令，打 help 看看有什么".to_owned()
-                }
-                _ => err.message(),
-            });
+            source
+                .printer()
+                .print(match err.syntax().map(|syntax| syntax.kind()) {
+                    Some(BuiltInError::DispatcherUnknownCommand) => {
+                        "没有这条指令，打 help 看看有什么".to_owned()
+                    }
+                    _ => err.message(),
+                });
         })
         .command(
             literal("echo").describe("把参数原样输出").then(

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use azalea_brigadier::{
     builder::argument_builder::ArgumentBuilder, command_dispatcher::CommandDispatcher,
-    errors::CommandSyntaxError,
+    errors::CommandError,
 };
 use nu_ansi_term::Style;
 use reedline::{EditMode, History};
@@ -188,7 +188,7 @@ where
     /// Handle structured command errors.
     pub fn on_error(
         mut self,
-        on_error: impl Fn(&CommandSyntaxError, &Source<S, R>) + Send + Sync + 'static,
+        on_error: impl Fn(&CommandError, &Source<S, R>) + Send + Sync + 'static,
     ) -> Self {
         self.inner = self.inner.on_error(on_error);
         self
