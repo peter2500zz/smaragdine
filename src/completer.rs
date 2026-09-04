@@ -276,6 +276,24 @@ mod tests {
         assert_eq!(tree.execute("kick Bob reason", source).unwrap(), 2);
     }
 
+    #[test]
+    fn optional_literal_is_suggested_after_terminal_space_run() {
+        let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
+        tree.register(
+            literal("kick")
+                .then(argument("player", word()).then(literal("reason").executes(|_| 2))),
+        );
+        let source = source();
+
+        for line in ["kick Bob ", "kick Bob  ", "kick Bob   "] {
+            let offered = suggest(&tree, &source, line, line.len());
+            assert_eq!(offered.len(), 1, "{line:?}");
+            assert_eq!(offered[0].value, "reason", "{line:?}");
+            assert_eq!(offered[0].span.end, line.len(), "{line:?}");
+            assert_eq!(offered[0].span.start, "kick Bob".len() + 1, "{line:?}");
+        }
+    }
+
     /// 指令名打全之后，自身与同前缀的更长指令都要列出来。
     ///
     /// brigadier 只丢弃「与已输入完全相同」的那一条（`SuggestionsBuilder::suggest`
