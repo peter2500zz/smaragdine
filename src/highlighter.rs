@@ -447,15 +447,9 @@ mod tests {
         use azalea_brigadier::prelude::*;
 
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
-        tree.register(
-            literal("add").then(
-                argument("a", integer()).then(
-                    argument("b", integer()).then(argument("c", integer()).executes(
-                        |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) },
-                    )),
-                ),
-            ),
-        );
+        tree.register(literal("add").then(integer("a").then(integer("b").then(
+            integer("c").executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
+        ))));
 
         let coloured: Vec<(String, Option<Color>)> =
             styled_line(&tree, &source(), &paint(), "add 1 2 3")
@@ -519,8 +513,8 @@ mod tests {
 
         let run = |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) };
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
-        let target = tree.register(literal("target").then(argument("b", integer()).executes(run)));
-        tree.register(literal("hop").then(argument("a", integer()).redirect(target)));
+        let target = tree.register(literal("target").then(integer("b").executes(run)));
+        tree.register(literal("hop").then(integer("a").redirect(target)));
 
         assert_eq!(
             spans_of(&tree, "hop 11 22"),
@@ -542,10 +536,8 @@ mod tests {
         let run = |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) };
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         tree.register(
-            literal("pair").then(
-                argument("x", integer())
-                    .then(literal("and").then(argument("x", integer()).executes(run))),
-            ),
+            literal("pair")
+                .then(integer("x").then(literal("and").then(integer("x").executes(run)))),
         );
 
         assert_eq!(

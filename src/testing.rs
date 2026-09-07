@@ -30,7 +30,7 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
 
     tree.register(
         literal("echo").describe("把参数原样输出").then(
-            argument("message", greedy_string())
+            greedy_string("message")
                 .describe("要输出的内容")
                 .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
         ),
@@ -68,7 +68,7 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
             .then(
                 literal("level").describe("设定级别").then(
                     // 没写说明的参数，说明退回 brigadier 的 examples()。
-                    argument("level", integer())
+                    integer("level")
                         .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
                 ),
             ),

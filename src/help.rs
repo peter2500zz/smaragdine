@@ -19,7 +19,6 @@
 use std::sync::Arc;
 
 use azalea_brigadier::{
-    builder::argument_builder::ArgumentBuilder,
     command_dispatcher::CommandDispatcher,
     context::CommandContext,
     prelude::*,
@@ -222,7 +221,7 @@ fn print_rows<S, R>(source: &Source<S, R>, rows: &[Usage]) {
     }
 }
 
-impl<S, R> From<Help<S, R>> for ArgumentBuilder<Source<S, R>, i32>
+impl<S, R> From<Help<S, R>> for CommandNode<Source<S, R>, i32>
 where
     S: Send + Sync + 'static,
     R: Send + 'static,
@@ -256,12 +255,14 @@ where
             node = node.describe(&description);
         }
 
-        node.executes(top).then(
-            // greedy：路径可以有好几段（`help proxy on`）。
-            argument("command", greedy_string())
-                .suggests(suggest_path::<S, R>)
-                .executes(deeper),
-        )
+        node.executes(top)
+            .then(
+                // greedy：路径可以有好几段（`help proxy on`）。
+                greedy_string("command")
+                    .suggests(suggest_path::<S, R>)
+                    .executes(deeper),
+            )
+            .build()
     }
 }
 

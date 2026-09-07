@@ -3,8 +3,7 @@
 use std::sync::Arc;
 
 use azalea_brigadier::{
-    builder::argument_builder::ArgumentBuilder, command_dispatcher::CommandDispatcher,
-    errors::CommandError,
+    command_dispatcher::CommandDispatcher, errors::CommandError, tree::CommandNode,
 };
 use nu_ansi_term::Style;
 use reedline::{EditMode, History};
@@ -118,9 +117,11 @@ where
     /// Register a command tree branch.
     ///
     /// Both `executes_async` and existing `executes` actions are accepted.
+    /// Typed argument builders and built command nodes are both accepted;
+    /// numeric bounds remain configurable after attaching an async handler.
     /// Synchronous actions run directly on a Tokio worker, so they must remain
     /// short and non-blocking; waiting work belongs in `executes_async`.
-    pub fn command(mut self, command: impl Into<ArgumentBuilder<Source<S, R>, i32>>) -> Self {
+    pub fn command(mut self, command: impl Into<CommandNode<Source<S, R>, i32>>) -> Self {
         self.inner = self.inner.command(command);
         self
     }
@@ -301,6 +302,46 @@ mod tests {
             .unwrap();
 
         assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn builder_accepts_typed_argument_roots_and_built_nodes() {
+        async fn read_count(ctx: Arc<CommandContext<Source<Nothing>>>) -> CommandResult {
+            yield_now().await;
+            Ok(get_integer(&ctx, "count").unwrap())
+        }
+        let runtime = Builder::new_current_thread().build().unwrap();
+        let console = AsyncConsole::builder(runtime.handle().clone())
+            .command(integer("count").executes_async(read_count).range(1..=3))
+            .command(literal("state").executes_async(read_state).build())
+            .command(crate::help("help"))
+            .build(Nothing { unlocked: true });
+        runtime.block_on(async {
+            let dispatcher = console.dispatcher();
+            assert_eq!(
+                dispatcher
+                    .execute_async("2 ", console.source())
+                    .await
+                    .unwrap(),
+                2
+            );
+            assert!(
+                dispatcher
+                    .execute_async("4", console.source())
+                    .await
+                    .unwrap_err()
+                    .syntax()
+                    .is_some()
+            );
+            assert_eq!(
+                dispatcher
+                    .execute_async("state", console.source())
+                    .await
+                    .unwrap(),
+                1
+            );
+            assert!(dispatcher.root.read().child("help").is_some());
+        });
     }
 
     #[test]

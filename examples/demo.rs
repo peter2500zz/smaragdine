@@ -80,18 +80,16 @@ fn main() {
                     _ => err.message(),
                 });
         })
-        .command(
-            literal("echo").describe("把参数原样输出").then(
-                argument("message", greedy_string())
-                    .describe("要输出的内容")
-                    .executes(|ctx: &CommandContext<Src>| -> CommandResult {
-                        ctx.source
-                            .printer()
-                            .print(get_string(ctx, "message").unwrap_or_default());
-                        Ok(1)
-                    }),
+        .command(literal("echo").describe("把参数原样输出").then(
+            greedy_string("message").describe("要输出的内容").executes(
+                |ctx: &CommandContext<Src>| -> CommandResult {
+                    ctx.source
+                        .printer()
+                        .print(get_string(ctx, "message").unwrap_or_default());
+                    Ok(1)
+                },
             ),
-        )
+        ))
         .command(literal("status").describe("看看现在是什么状态").executes(
             |ctx: &CommandContext<Src>| -> CommandResult {
                 let app = ctx.source.state();
@@ -129,15 +127,17 @@ fn main() {
                     &app.verbose
                 }))
                 // 没写说明的参数：右侧退回 brigadier 自带的例子。
-                .then(literal("level").describe("设定级别").then(
-                    argument("level", integer()).executes(
-                        |ctx: &CommandContext<Src>| -> CommandResult {
-                            let level = get_integer(ctx, "level").unwrap_or(0);
-                            ctx.source.printer().print(format!("级别设为 {level}"));
-                            Ok(1)
-                        },
-                    ),
-                )),
+                .then(
+                    literal("level")
+                        .describe("设定级别")
+                        .then(integer("level").executes(
+                            |ctx: &CommandContext<Src>| -> CommandResult {
+                                let level = get_integer(ctx, "level").unwrap_or(0);
+                                ctx.source.printer().print(format!("级别设为 {level}"));
+                                Ok(1)
+                            },
+                        )),
+                ),
         )
         .command(literal("unlock").describe("解锁危险指令").executes(
             |ctx: &CommandContext<Src>| -> CommandResult {

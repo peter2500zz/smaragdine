@@ -19,7 +19,7 @@
 //! let console = Console::<State, Bye>::builder_with_reason()
 //!     .command(
 //!         literal("echo").describe("把参数原样输出").then(
-//!             argument("message", greedy_string())
+//!             greedy_string("message")
 //!                 .describe("要输出的内容")
 //!                 .executes(|ctx: &CommandContext<Src>| -> CommandResult {
 //!                     ctx.source.printer().print(get_string(ctx, "message").unwrap_or_default());
@@ -81,8 +81,7 @@ mod util;
 use std::{io::IsTerminal, sync::Arc};
 
 use azalea_brigadier::{
-    builder::argument_builder::ArgumentBuilder, command_dispatcher::CommandDispatcher,
-    errors::CommandError,
+    command_dispatcher::CommandDispatcher, errors::CommandError, tree::CommandNode,
 };
 use nu_ansi_term::Style;
 use reedline::{EditMode, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
@@ -490,8 +489,21 @@ where
     ///
     /// 说明写在节点上（`describe()`），补全菜单直接读它 —— 没有第二张表要
     /// 维护，同名子指令（`proxy on` 与 `log on`）也各说各的。
-    pub fn command(mut self, command: impl Into<ArgumentBuilder<Source<S, R>, i32>>) -> Self {
-        self.dispatcher.register(command.into());
+    ///
+    /// 接受保留具体解析器类型的 builder，也接受已经构建的 `CommandNode`。
+    /// 自定义命令包装类型应实现到 `CommandNode` 的转换；内置 [`Help`] 已适配。
+    ///
+    /// ```
+    /// use smaragdine::prelude::*;
+    /// let _console = Console::builder()
+    ///     .command(integer("count").describe("次数").range(1..=10)
+    ///         .executes(|ctx: &CommandContext<Source<()>>| -> CommandResult {
+    ///             Ok(get_integer(ctx, "count").unwrap())
+    ///         }))
+    ///     .build(());
+    /// ```
+    pub fn command(mut self, command: impl Into<CommandNode<Source<S, R>, i32>>) -> Self {
+        self.dispatcher.register(command);
         self
     }
 
@@ -677,6 +689,52 @@ mod tests {
     };
 
     struct Wrapped<T>(T);
+
+    #[test]
+    fn console_accepts_typed_arguments_built_nodes_and_command_wrappers() {
+        type Src = Source<Nothing>;
+        let errors = StdArc::new(AtomicUsize::new(0));
+        let builtin = literal::<Src, i32>("ready")
+            .executes(|_| -> CommandResult { Ok(1) })
+            .build();
+        let console = Console::builder()
+            .command(
+                integer("count")
+                    .describe("次数")
+                    .executes(|ctx: &CommandContext<Src>| -> CommandResult {
+                        Ok(get_integer(ctx, "count").unwrap())
+                    })
+                    .range(1..=3),
+            )
+            .command(builtin)
+            .command(help("help"))
+            .on_error({
+                let errors = StdArc::clone(&errors);
+                move |error, _| {
+                    assert!(matches!(
+                        error.syntax().unwrap().kind(),
+                        azalea_brigadier::errors::BuiltInError::IntegerTooBig { .. }
+                    ));
+                    errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })
+            .build(Nothing { unlocked: true });
+
+        assert_eq!(
+            console.dispatcher.execute("2 ", console.source()).unwrap(),
+            2
+        );
+        assert_eq!(
+            console
+                .dispatcher
+                .execute("ready", console.source())
+                .unwrap(),
+            1
+        );
+        assert!(console.dispatcher.root.read().child("help").is_some());
+        run_line(&console, "4");
+        assert_eq!(errors.load(Ordering::Relaxed), 1);
+    }
 
     fn console() -> Console<Nothing, i32> {
         Console::<Nothing, i32>::builder_with_reason()

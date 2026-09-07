@@ -263,12 +263,9 @@ mod tests {
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         tree.register(
             literal("kick").then(
-                argument("player", word())
+                word("player")
                     .executes(|_| -> CommandResult { Ok(1) })
-                    .then(
-                        argument("reason", greedy_string())
-                            .executes(|_| -> CommandResult { Ok(2) }),
-                    ),
+                    .then(greedy_string("reason").executes(|_| -> CommandResult { Ok(2) })),
             ),
         );
         let source = source();
@@ -284,8 +281,7 @@ mod tests {
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         tree.register(
             literal("kick").then(
-                argument("player", word())
-                    .then(literal("reason").executes(|_| -> CommandResult { Ok(2) })),
+                word("player").then(literal("reason").executes(|_| -> CommandResult { Ok(2) })),
             ),
         );
         let source = source();

@@ -89,7 +89,7 @@ fn sync_commands() -> CommandDispatcher<()> {
         literal("greet") => { run: hello; };
         literal("list").describe("List entries") => {
             run: hello;
-            argument("number", integer()) => { run: read_number; };
+            integer("number").describe("Entry count").range(1..=100) => { run: read_number; };
         };
         literal("group") => {
             literal("child") => { run: hello; };
@@ -126,9 +126,9 @@ fn async_commands() -> CommandDispatcher<()> {
         literal("greet") => { run sync: hello; };
         literal("list").describe("List entries asynchronously") => {
             run: list;
-            argument("number", integer()) => {
+            integer("number").range(1..=100).describe("Entry count") => {
                 run: list_number;
-                argument("reversed", bool()) => { run: reversed; };
+                boolean("reversed") => { run: reversed; };
             };
         };
         literal("closure") => { run: async |ctx| -> CommandResult {
@@ -200,6 +200,8 @@ mod tests {
         }
         assert!(dispatcher.execute("group", ()).is_err());
         assert!(dispatcher.execute("list nope", ()).is_err());
+        assert!(dispatcher.execute("list 0", ()).is_err());
+        assert!(dispatcher.execute("list 101", ()).is_err());
     }
 
     #[test]
@@ -396,6 +398,8 @@ mod tests {
             ] {
                 assert_eq!(dispatcher.execute_async(input, ()).await.unwrap(), expected);
             }
+            assert!(dispatcher.execute_async("list 0", ()).await.is_err());
+            assert!(dispatcher.execute_async("list 101 true", ()).await.is_err());
         });
         assert_eq!(dispatcher.execute("greet", ()).unwrap(), 1);
         assert!(dispatcher.execute("list", ()).is_err());
