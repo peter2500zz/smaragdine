@@ -44,9 +44,9 @@ fn main() {
     let console = Console::builder()
         // 以 Minecraft 风格注册命令
         .command(
-            literal("ping").executes(|ctx: &CommandContext<Source<App>>| {
+            literal("ping").executes(|ctx: &CommandContext<Source<App>>| -> CommandResult {
                 ctx.source.printer().print("pong!");
-                1
+                Ok(1)
             }),
         )
         .build(App::default());
