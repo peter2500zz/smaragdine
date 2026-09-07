@@ -1,5 +1,9 @@
+use smaragdine::brigadier::{
+    arguments::{ArgumentType, ParsedValue},
+    errors::BuiltInError,
+    string_reader::StringReader,
+};
 use smaragdine::prelude::*;
-#[cfg(any(feature = "async", test))]
 use std::sync::Arc;
 
 // These macros intentionally remain private to this executable example.
@@ -75,6 +79,93 @@ macro_rules! commands {
     }};
 }
 
+#[derive(Default)]
+struct PlayerParser {
+    online_only: bool,
+    case_insensitive: bool,
+}
+
+#[derive(Debug, PartialEq)]
+struct Player(String);
+
+impl ArgumentType for PlayerParser {
+    fn parse(&self, reader: &mut StringReader) -> Result<Arc<ParsedValue>, CommandSyntaxError> {
+        let start = reader.cursor();
+        let mut name = reader.read_string()?;
+        // This example's online registry contains just Bob.
+        if self.case_insensitive && name.eq_ignore_ascii_case("Bob") {
+            name = "Bob".to_owned();
+        }
+        if self.online_only && name != "Bob" {
+            reader.cursor = start;
+            return Err(BuiltInError::DispatcherParseException {
+                message: "player is not online".to_owned(),
+            }
+            .create_with_context(reader));
+        }
+        Ok(Arc::new(Player(name)))
+    }
+}
+
+impl CommandArgument for PlayerParser {
+    type Builder<S, R> = PlayerArgument<S, R>;
+}
+
+struct PlayerArgument<S, R>(ArgumentBuilder<S, R, PlayerParser>);
+
+impl<S, R> From<ArgumentBuilder<S, R, PlayerParser>> for PlayerArgument<S, R> {
+    fn from(builder: ArgumentBuilder<S, R, PlayerParser>) -> Self {
+        Self(builder)
+    }
+}
+
+impl<S, R> CommandBuilder for PlayerArgument<S, R> {
+    type Source = S;
+    type Output = R;
+    type Kind = PlayerParser;
+
+    fn as_builder(&self) -> &ArgumentBuilder<S, R, PlayerParser> {
+        &self.0
+    }
+
+    fn map_builder(
+        self,
+        update: impl FnOnce(ArgumentBuilder<S, R, PlayerParser>) -> ArgumentBuilder<S, R, PlayerParser>,
+    ) -> Self {
+        Self(update(self.0))
+    }
+
+    fn into_builder(self) -> ArgumentBuilder<S, R, PlayerParser> {
+        self.0
+    }
+}
+
+impl<S, R> PlayerArgument<S, R> {
+    fn online_only(mut self) -> Self {
+        self.0.parser_mut().online_only = true;
+        self
+    }
+
+    fn case_insensitive(mut self) -> Self {
+        self.0.parser_mut().case_insensitive = true;
+        self
+    }
+}
+
+fn kick_player(ctx: &CommandContext<()>) -> CommandResult {
+    let player = ctx
+        .argument("player")
+        .unwrap()
+        .downcast_ref::<Player>()
+        .unwrap();
+    assert_eq!(player, &Player("Bob".to_owned()));
+    Ok(if ctx.argument("reason").is_some() {
+        2
+    } else {
+        1
+    })
+}
+
 fn hello(_: &CommandContext<()>) -> CommandResult {
     Ok(1)
 }
@@ -94,12 +185,26 @@ fn sync_commands() -> CommandDispatcher<()> {
         literal("group") => {
             literal("child") => { run: hello; };
         };
+        literal("kick") => {
+            PlayerParser::arg("player")
+                .online_only()
+                .describe("Target player")
+                .case_insensitive() => {
+                    run: kick_player;
+                    greedy_string("reason") => { run: kick_player; };
+                };
+        };
     });
     dispatcher
 }
 
 #[cfg(feature = "async")]
 fn async_commands() -> CommandDispatcher<()> {
+    async fn kick(ctx: Arc<CommandContext<()>>) -> CommandResult {
+        smaragdine::tokio::task::yield_now().await;
+        kick_player(&ctx)
+    }
+
     async fn list(_: Arc<CommandContext<()>>) -> CommandResult {
         Ok(2)
     }
@@ -141,6 +246,15 @@ fn async_commands() -> CommandDispatcher<()> {
             // Overriding the parent handler does not change child defaults.
             literal("child") => { run: list; };
         };
+        literal("kick") => {
+            PlayerParser::arg("player")
+                .online_only()
+                .describe("Target player")
+                .case_insensitive() => {
+                    run: kick;
+                    greedy_string("reason") => { run: kick; };
+                };
+        };
     });
     commands!(dispatcher, {
         literal("override") => { run async: list; };
@@ -153,6 +267,8 @@ fn main() {
     assert_eq!(dispatcher.execute("greet", ()).unwrap(), 1);
     assert_eq!(dispatcher.execute("list 7", ()).unwrap(), 7);
     assert_eq!(dispatcher.execute("group child", ()).unwrap(), 1);
+    assert_eq!(dispatcher.execute("kick bob", ()).unwrap(), 1);
+    assert_eq!(dispatcher.execute("kick BOB too loud", ()).unwrap(), 2);
 
     #[cfg(feature = "async")]
     {
@@ -169,6 +285,8 @@ fn main() {
                 ("closure", 3),
                 ("group child", 2),
                 ("override", 2),
+                ("kick bob", 1),
+                ("kick BOB too loud", 2),
             ] {
                 assert_eq!(dispatcher.execute_async(input, ()).await.unwrap(), expected);
             }
@@ -179,11 +297,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use smaragdine::brigadier::{
-        arguments::{ArgumentType, ParsedValue},
-        string_reader::StringReader,
-        suggestion::SuggestionsBuilder,
-    };
+    use smaragdine::brigadier::suggestion::SuggestionsBuilder;
 
     #[test]
     fn synchronous_tree_keeps_optional_arguments_and_pure_branches() {
@@ -195,6 +309,9 @@ mod tests {
             ("list 7", 7),
             ("list 7 ", 7),
             ("group child", 1),
+            ("kick bob", 1),
+            ("kick BOB   ", 1),
+            ("kick bob too loud", 2),
         ] {
             assert_eq!(dispatcher.execute(input, ()).unwrap(), expected);
         }
@@ -202,6 +319,83 @@ mod tests {
         assert!(dispatcher.execute("list nope", ()).is_err());
         assert!(dispatcher.execute("list 0", ()).is_err());
         assert!(dispatcher.execute("list 101", ()).is_err());
+        assert!(dispatcher.execute("kick Eve", ()).is_err());
+    }
+
+    #[test]
+    fn a_custom_macro_builder_registers_directly_with_the_console() {
+        let command = command!(PlayerParser::arg("player").describe("Target") => {
+            run: |ctx: &CommandContext<Source<()>>| -> CommandResult {
+                assert_eq!(ctx.argument("player").unwrap().downcast_ref::<Player>().unwrap(),
+                    &Player("Bob".to_owned()));
+                Ok(1)
+            };
+        })
+        .online_only()
+        .case_insensitive();
+        let console = Console::builder()
+            .command(command)
+            .command(smaragdine::help("help"))
+            .build(());
+        assert_eq!(
+            console
+                .dispatcher()
+                .execute("bob ", console.source())
+                .unwrap(),
+            1
+        );
+        assert!(
+            console
+                .dispatcher()
+                .execute("Eve", console.source())
+                .is_err()
+        );
+        assert!(console.dispatcher().root.read().child("help").is_some());
+    }
+
+    #[cfg(feature = "async")]
+    #[test]
+    fn a_custom_macro_builder_registers_directly_with_the_async_console() {
+        async fn run(ctx: Arc<CommandContext<Source<()>>>) -> CommandResult {
+            smaragdine::tokio::task::yield_now().await;
+            assert_eq!(
+                ctx.argument("player")
+                    .unwrap()
+                    .downcast_ref::<Player>()
+                    .unwrap(),
+                &Player("Bob".to_owned())
+            );
+            Ok(1)
+        }
+        let runtime = smaragdine::tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let command = command!(async; PlayerParser::arg("player").describe("Target") => {
+            run: run;
+        })
+        .case_insensitive()
+        .online_only();
+        let console = AsyncConsole::builder(runtime.handle().clone())
+            .command(command)
+            .command(smaragdine::help("help"))
+            .build(());
+        runtime.block_on(async {
+            assert_eq!(
+                console
+                    .dispatcher()
+                    .execute_async("BOB ", console.source())
+                    .await
+                    .unwrap(),
+                1
+            );
+            assert!(
+                console
+                    .dispatcher()
+                    .execute_async("Eve", console.source())
+                    .await
+                    .is_err()
+            );
+        });
     }
 
     #[test]
@@ -228,22 +422,12 @@ mod tests {
         assert_eq!(dispatcher.execute("reusable", ()).unwrap(), 4);
     }
 
-    struct PlayerParser;
-    #[derive(Debug, PartialEq)]
-    struct Player(String);
-
-    impl ArgumentType for PlayerParser {
-        fn parse(&self, reader: &mut StringReader) -> Result<Arc<ParsedValue>, CommandSyntaxError> {
-            Ok(Arc::new(Player(reader.read_unquoted_string().to_owned())))
-        }
-    }
-
     #[test]
     fn arbitrary_builders_preserve_metadata_suggestions_and_routing() {
         let mut dispatcher = CommandDispatcher::<()>::new();
         commands!(dispatcher, {
             literal("target").describe("Choose a player") => {
-                argument("player", PlayerParser)
+                PlayerParser::arg("player")
                     .suggests(|_: CommandContext<()>, builder: SuggestionsBuilder| {
                         builder.suggest("Bob").build()
                     }) => {
@@ -347,7 +531,11 @@ mod tests {
         use smaragdine::brigadier::context::CommandContextRef;
         use std::rc::Rc;
 
+        #[derive(Default)]
         struct LocalParser;
+        impl CommandArgument for LocalParser {
+            type Builder<S, R> = ArgumentBuilder<S, R, Self>;
+        }
         impl ArgumentType for LocalParser {
             #[allow(clippy::arc_with_non_send_sync)]
             fn parse(
@@ -361,7 +549,7 @@ mod tests {
         let mut dispatcher = CommandDispatcher::<()>::new();
         commands!(dispatcher, {
             literal("local") => {
-                argument("value", LocalParser) => {
+                LocalParser::arg("value") => {
                     run: |ctx| -> CommandResult {
                         Ok(**ctx.argument("value").unwrap()
                             .downcast_ref::<Rc<i32>>().unwrap())
@@ -395,11 +583,15 @@ mod tests {
                 ("group", 1),
                 ("group child", 2),
                 ("override", 2),
+                ("kick bob", 1),
+                ("kick BOB   ", 1),
+                ("kick bob too loud", 2),
             ] {
                 assert_eq!(dispatcher.execute_async(input, ()).await.unwrap(), expected);
             }
             assert!(dispatcher.execute_async("list 0", ()).await.is_err());
             assert!(dispatcher.execute_async("list 101 true", ()).await.is_err());
+            assert!(dispatcher.execute_async("kick Eve", ()).await.is_err());
         });
         assert_eq!(dispatcher.execute("greet", ()).unwrap(), 1);
         assert!(dispatcher.execute("list", ()).is_err());

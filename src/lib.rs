@@ -81,7 +81,7 @@ mod util;
 use std::{io::IsTerminal, sync::Arc};
 
 use azalea_brigadier::{
-    command_dispatcher::CommandDispatcher, errors::CommandError, tree::CommandNode,
+    builder::IntoCommandNode, command_dispatcher::CommandDispatcher, errors::CommandError,
 };
 use nu_ansi_term::Style;
 use reedline::{EditMode, ExternalPrinter, History, Reedline, ReedlineMenu, Signal};
@@ -491,7 +491,8 @@ where
     /// 维护，同名子指令（`proxy on` 与 `log on`）也各说各的。
     ///
     /// 接受保留具体解析器类型的 builder，也接受已经构建的 `CommandNode`。
-    /// 自定义命令包装类型应实现到 `CommandNode` 的转换；内置 [`Help`] 已适配。
+    /// 自定义 builder 实现 `CommandBuilder` 即可；其他命令包装类型实现
+    /// `IntoCommandNode`，内置 [`Help`] 已适配。
     ///
     /// ```
     /// use smaragdine::prelude::*;
@@ -502,7 +503,7 @@ where
     ///         }))
     ///     .build(());
     /// ```
-    pub fn command(mut self, command: impl Into<CommandNode<Source<S, R>, i32>>) -> Self {
+    pub fn command(mut self, command: impl IntoCommandNode<Source<S, R>, i32>) -> Self {
         self.dispatcher.register(command);
         self
     }

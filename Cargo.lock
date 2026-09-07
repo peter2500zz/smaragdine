@@ -20,7 +20,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "azalea-brigadier"
 version = "0.16.0+mc26.2"
-source = "git+https://github.com/peter2500zz/azalea?branch=experimental#b5093ac5288593a83413990d076b2bae596d3119"
+source = "git+https://github.com/peter2500zz/azalea?branch=experimental#9338262fc33323da2085b3d10644a15c45725d5b"
 dependencies = [
  "parking_lot",
 ]

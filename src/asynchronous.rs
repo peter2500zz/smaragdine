@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use azalea_brigadier::{
-    command_dispatcher::CommandDispatcher, errors::CommandError, tree::CommandNode,
+    builder::IntoCommandNode, command_dispatcher::CommandDispatcher, errors::CommandError,
 };
 use nu_ansi_term::Style;
 use reedline::{EditMode, History};
@@ -121,7 +121,7 @@ where
     /// numeric bounds remain configurable after attaching an async handler.
     /// Synchronous actions run directly on a Tokio worker, so they must remain
     /// short and non-blocking; waiting work belongs in `executes_async`.
-    pub fn command(mut self, command: impl Into<CommandNode<Source<S, R>, i32>>) -> Self {
+    pub fn command(mut self, command: impl IntoCommandNode<Source<S, R>, i32>) -> Self {
         self.inner = self.inner.command(command);
         self
     }

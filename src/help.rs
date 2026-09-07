@@ -221,6 +221,16 @@ fn print_rows<S, R>(source: &Source<S, R>, rows: &[Usage]) {
     }
 }
 
+impl<S, R> IntoCommandNode<Source<S, R>, i32> for Help<S, R>
+where
+    S: Send + Sync + 'static,
+    R: Send + 'static,
+{
+    fn into_node(self) -> CommandNode<Source<S, R>, i32> {
+        self.into()
+    }
+}
+
 impl<S, R> From<Help<S, R>> for CommandNode<Source<S, R>, i32>
 where
     S: Send + Sync + 'static,
