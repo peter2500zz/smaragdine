@@ -262,6 +262,10 @@ mod tests {
     use super::*;
     use crate::testing::Nothing;
 
+    async fn read_state(ctx: Arc<CommandContext<Source<Nothing>>>) -> CommandResult {
+        Ok(i32::from(ctx.source.state().unlocked))
+    }
+
     fn drive_until(runtime: &tokio::runtime::Runtime, done: impl Fn() -> bool) {
         runtime.block_on(async {
             for _ in 0..20_000 {
@@ -282,6 +286,21 @@ mod tests {
 
         assert!(Arc::ptr_eq(console.state(), &state));
         assert_eq!(console.runtime().id(), runtime.handle().id());
+    }
+
+    #[test]
+    fn builder_accepts_a_named_async_function_directly() {
+        let runtime = Builder::new_current_thread().build().unwrap();
+        let console = AsyncConsole::builder(runtime.handle().clone())
+            .command(literal("state").executes_async(read_state))
+            .build(Nothing { unlocked: true });
+
+        let dispatcher = console.dispatcher();
+        let result = runtime
+            .block_on(dispatcher.execute_async("state", console.source()))
+            .unwrap();
+
+        assert_eq!(result, 1);
     }
 
     #[test]
