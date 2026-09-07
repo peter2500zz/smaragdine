@@ -84,16 +84,16 @@ fn main() {
             literal("echo").describe("把参数原样输出").then(
                 argument("message", greedy_string())
                     .describe("要输出的内容")
-                    .executes(|ctx: &CommandContext<Src>| {
+                    .executes(|ctx: &CommandContext<Src>| -> CommandResult {
                         ctx.source
                             .printer()
                             .print(get_string(ctx, "message").unwrap_or_default());
-                        1
+                        Ok(1)
                     }),
             ),
         )
         .command(literal("status").describe("看看现在是什么状态").executes(
-            |ctx: &CommandContext<Src>| {
+            |ctx: &CommandContext<Src>| -> CommandResult {
                 let app = ctx.source.state();
                 ctx.source.printer().print(format!(
                     "代理 {} / 详细日志 {} / {} / 后台已跑 {} 轮",
@@ -106,7 +106,7 @@ fn main() {
                     },
                     app.ticks.load(Ordering::Relaxed),
                 ));
-                1
+                Ok(1)
             },
         ))
         // 两条指令下各有一个 `on` —— 说明挂在节点上，所以各说各的。
@@ -130,56 +130,58 @@ fn main() {
                 }))
                 // 没写说明的参数：右侧退回 brigadier 自带的例子。
                 .then(literal("level").describe("设定级别").then(
-                    argument("level", integer()).executes(|ctx: &CommandContext<Src>| {
-                        let level = get_integer(ctx, "level").unwrap_or(0);
-                        ctx.source.printer().print(format!("级别设为 {level}"));
-                        1
-                    }),
+                    argument("level", integer()).executes(
+                        |ctx: &CommandContext<Src>| -> CommandResult {
+                            let level = get_integer(ctx, "level").unwrap_or(0);
+                            ctx.source.printer().print(format!("级别设为 {level}"));
+                            Ok(1)
+                        },
+                    ),
                 )),
         )
         .command(literal("unlock").describe("解锁危险指令").executes(
-            |ctx: &CommandContext<Src>| {
+            |ctx: &CommandContext<Src>| -> CommandResult {
                 ctx.source.state().unlocked.store(true, Ordering::Relaxed);
                 ctx.source.printer().print("已解锁，danger 现在可用了");
-                1
+                Ok(1)
             },
         ))
-        .command(
-            literal("lock")
-                .describe("锁回去")
-                .executes(|ctx: &CommandContext<Src>| {
-                    ctx.source.state().unlocked.store(false, Ordering::Relaxed);
-                    ctx.source.printer().print("已上锁");
-                    1
-                }),
-        )
+        .command(literal("lock").describe("锁回去").executes(
+            |ctx: &CommandContext<Src>| -> CommandResult {
+                ctx.source.state().unlocked.store(false, Ordering::Relaxed);
+                ctx.source.printer().print("已上锁");
+                Ok(1)
+            },
+        ))
         // requires 判不过时，这条指令连菜单里都不会出现。判定用的是真实
         // 状态，所以「看得见」与「跑得动」始终是同一回事。
         .command(
             literal("danger")
                 .describe("解锁之后才看得见的指令")
                 .requires(|s: &Src| s.state().unlocked.load(Ordering::Relaxed))
-                .executes(|ctx: &CommandContext<Src>| {
+                .executes(|ctx: &CommandContext<Src>| -> CommandResult {
                     ctx.source.printer().print("砰");
-                    1
+                    Ok(1)
                 }),
         )
         .command(
             literal("slow")
                 .describe("跑三秒，期间照样能输入下一条")
-                .executes(|ctx: &CommandContext<Src>| {
+                .executes(|ctx: &CommandContext<Src>| -> CommandResult {
                     ctx.source
                         .printer()
                         .print("开始…（试着现在就打下一条指令）");
                     std::thread::sleep(Duration::from_secs(3));
                     ctx.source.printer().print("跑完了");
-                    1
+                    Ok(1)
                 }),
         )
         .command(
             literal("boom")
                 .describe("故意 panic —— 控制台会兜住它")
-                .executes(|_: &CommandContext<Src>| -> i32 { panic!("演示用的 panic") }),
+                .executes(|_: &CommandContext<Src>| -> CommandResult {
+                    panic!("演示用的 panic")
+                }),
         )
         // 帮助是个生成器：默认分层实现，名字、说明、排版、路径不认识时说
         // 什么，都能换。不写这一行就没有 help。
@@ -188,20 +190,18 @@ fn main() {
                 .describe("显示指令帮助；help <指令> 往下看一层")
                 .not_found("没有这条指令"),
         )
-        .command(
-            literal("stop")
-                .describe("退出")
-                .executes(|ctx: &CommandContext<Src>| {
-                    ctx.source.request_exit(Bye::Stop);
-                    1
-                }),
-        )
+        .command(literal("stop").describe("退出").executes(
+            |ctx: &CommandContext<Src>| -> CommandResult {
+                ctx.source.request_exit(Bye::Stop);
+                Ok(1)
+            },
+        ))
         .command(
             literal("restart")
                 .describe("退出，并让主程序重来一遍")
-                .executes(|ctx: &CommandContext<Src>| {
+                .executes(|ctx: &CommandContext<Src>| -> CommandResult {
                     ctx.source.request_exit(Bye::Restart);
-                    1
+                    Ok(1)
                 }),
         )
         .build(Arc::clone(&state));
@@ -249,12 +249,12 @@ fn switch(
     let name = name.to_owned();
     literal(&name)
         .describe(about)
-        .executes(move |ctx: &CommandContext<Src>| {
+        .executes(move |ctx: &CommandContext<Src>| -> CommandResult {
             pick(ctx.source.state()).store(to, Ordering::Relaxed);
             ctx.source
                 .printer()
                 .print(format!("{name} —— 已{}", onoff(to)));
-            1
+            Ok(1)
         })
 }
 

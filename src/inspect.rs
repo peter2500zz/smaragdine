@@ -214,13 +214,16 @@ mod tests {
     #[cfg(feature = "async")]
     #[test]
     fn an_async_command_is_runnable() {
+        use std::sync::Arc;
+
         use azalea_brigadier::prelude::*;
 
         let mut dispatcher = CommandDispatcher::new();
-        dispatcher.register(
-            literal("later")
-                .executes_async(|_: &CommandContext<Source<crate::testing::Nothing>>| async { 1 }),
-        );
+        dispatcher.register(literal("later").executes_async(
+            |_: Arc<CommandContext<Source<crate::testing::Nothing>>>| async {
+                Ok::<_, BoxCommandError>(1)
+            },
+        ));
         let source = source();
 
         assert_eq!(

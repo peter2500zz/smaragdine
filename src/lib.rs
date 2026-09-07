@@ -21,18 +21,18 @@
 //!         literal("echo").describe("把参数原样输出").then(
 //!             argument("message", greedy_string())
 //!                 .describe("要输出的内容")
-//!                 .executes(|ctx: &CommandContext<Src>| {
+//!                 .executes(|ctx: &CommandContext<Src>| -> CommandResult {
 //!                     ctx.source.printer().print(get_string(ctx, "message").unwrap_or_default());
-//!                     1
+//!                     Ok(1)
 //!                 }),
 //!         ),
 //!     )
 //!     .command(
 //!         literal("stop")
 //!             .describe("关停并退出")
-//!             .executes(|ctx: &CommandContext<Src>| {
+//!             .executes(|ctx: &CommandContext<Src>| -> CommandResult {
 //!                 ctx.source.request_exit(Bye::Stop);
-//!                 1
+//!                 Ok(1)
 //!             }),
 //!     )
 //!     .build(Arc::clone(&state));
@@ -201,9 +201,9 @@ where
     /// # struct App;
     /// # type Src = Source<App, i32>;
     /// # let console = Console::<App, i32>::builder_with_reason()
-    /// #     .command(literal("stop").executes(|ctx: &CommandContext<Src>| {
+    /// #     .command(literal("stop").executes(|ctx: &CommandContext<Src>| -> CommandResult {
     /// #         ctx.source.request_exit(0);
-    /// #         1
+    /// #         Ok(1)
     /// #     }))
     /// #     .build(App);
     /// let dispatcher = console.dispatcher();
@@ -681,16 +681,16 @@ mod tests {
     fn console() -> Console<Nothing, i32> {
         Console::<Nothing, i32>::builder_with_reason()
             .command(literal("quit").describe("退出").executes(
-                |ctx: &CommandContext<Source<Nothing, i32>>| {
+                |ctx: &CommandContext<Source<Nothing, i32>>| -> CommandResult {
                     ctx.source.request_exit(3);
-                    1
+                    Ok(1)
                 },
             ))
-            .command(
-                literal("boom").executes(|_: &CommandContext<Source<Nothing, i32>>| -> i32 {
+            .command(literal("boom").executes(
+                |_: &CommandContext<Source<Nothing, i32>>| -> CommandResult {
                     panic!("指令体崩了");
-                }),
-            )
+                },
+            ))
             .build(Nothing { unlocked: true })
     }
 
@@ -766,7 +766,10 @@ mod tests {
     fn the_error_hook_gets_the_structured_error() {
         let seen = StdArc::new(AtomicUsize::new(0));
         let console = Console::builder()
-            .command(literal("quit").executes(|_: &CommandContext<Source<Nothing>>| 1))
+            .command(
+                literal("quit")
+                    .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
+            )
             .on_error({
                 let seen = StdArc::clone(&seen);
                 move |err, source| {
@@ -789,7 +792,7 @@ mod tests {
     fn the_error_hook_gets_execution_errors() {
         let seen = StdArc::new(AtomicUsize::new(0));
         let console = Console::builder()
-            .command(literal("fail").executes_result(
+            .command(literal("fail").executes(
                 |_: &CommandContext<Source<Nothing>>| -> Result<i32, std::io::Error> {
                     Err(std::io::Error::other("command failed"))
                 },

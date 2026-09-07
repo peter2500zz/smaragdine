@@ -52,8 +52,10 @@ pub struct Usage {
 /// # struct App;
 /// # let console = Console::builder()
 /// #     .command(literal("proxy").describe("上游代理")
-/// #         .then(literal("on").describe("开").executes(|_: &CommandContext<Source<App>>| 1))
-/// #         .then(literal("off").describe("关").executes(|_: &CommandContext<Source<App>>| 1)))
+/// #         .then(literal("on").describe("开").executes(
+/// #             |_: &CommandContext<Source<App>>| -> CommandResult { Ok(1) }))
+/// #         .then(literal("off").describe("关").executes(
+/// #             |_: &CommandContext<Source<App>>| -> CommandResult { Ok(1) })))
 /// #     .build(App);
 /// let rows = smaragdine::usage(&console.dispatcher(), &console.source(), "proxy").unwrap();
 ///
@@ -235,17 +237,17 @@ where
 
         let top = {
             let (render, not_found) = (Arc::clone(&render), not_found.clone());
-            move |ctx: &CommandContext<Source<S, R>>| {
+            move |ctx: &CommandContext<Source<S, R>>| -> CommandResult {
                 show(ctx, "", &render, &not_found);
-                1
+                Ok(1)
             }
         };
         let deeper = {
             // 最后一处用到，直接搬走。
-            move |ctx: &CommandContext<Source<S, R>>| {
+            move |ctx: &CommandContext<Source<S, R>>| -> CommandResult {
                 let path = get_string(ctx, "command").unwrap_or_default();
                 show(ctx, &path, &render, &not_found);
-                1
+                Ok(1)
             }
         };
 
@@ -354,11 +356,9 @@ mod tests {
     #[test]
     fn async_only_commands_are_listed() {
         let mut dispatcher = CommandDispatcher::new();
-        dispatcher.register(
-            literal("later")
-                .describe("异步执行")
-                .executes_async(|_: &CommandContext<Source<Nothing>>| async { 1 }),
-        );
+        dispatcher.register(literal("later").describe("异步执行").executes_async(
+            |_: Arc<CommandContext<Source<Nothing>>>| async { Ok::<_, BoxCommandError>(1) },
+        ));
 
         assert_eq!(
             usage(&dispatcher, &source(), ""),
@@ -423,7 +423,7 @@ mod tests {
             .command(
                 literal("quit")
                     .describe("退出")
-                    .executes(|_: &CommandContext<Source<Nothing>>| 1),
+                    .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
             )
             .command(help("help").describe("显示指令帮助").render({
                 let printed = Arc::clone(&printed);
@@ -472,23 +472,20 @@ mod tests {
     /// 路径参数要有候选，否则树越深越两眼一抹黑。
     #[test]
     fn the_path_argument_suggests_the_next_level() {
-        let console = Console::builder()
-            .command(
-                literal("proxy")
-                    .describe("上游代理")
-                    .then(
-                        literal("on")
-                            .describe("开")
-                            .executes(|_: &CommandContext<Source<Nothing>>| 1),
-                    )
-                    .then(
-                        literal("off")
-                            .describe("关")
-                            .executes(|_: &CommandContext<Source<Nothing>>| 1),
-                    ),
-            )
-            .command(help("help"))
-            .build(Nothing { unlocked: true });
+        let console =
+            Console::builder()
+                .command(
+                    literal("proxy")
+                        .describe("上游代理")
+                        .then(literal("on").describe("开").executes(
+                            |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) },
+                        ))
+                        .then(literal("off").describe("关").executes(
+                            |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) },
+                        )),
+                )
+                .command(help("help"))
+                .build(Nothing { unlocked: true });
 
         let offered = |line: &str| -> Vec<(String, Option<String>)> {
             crate::completer::suggest(&console.dispatcher(), &console.source(), line, line.len())

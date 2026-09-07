@@ -294,13 +294,13 @@ mod tests {
         let console = AsyncConsole::builder(runtime.handle().clone())
             .command(literal("where").executes_async({
                 let completed = Arc::clone(&completed);
-                move |_: &CommandContext<Source<Nothing>>| {
+                move |_: Arc<CommandContext<Source<Nothing>>>| {
                     let sender = sender.clone();
                     let completed = Arc::clone(&completed);
                     async move {
                         sender.send(thread::current().id()).unwrap();
                         completed.fetch_add(1, Ordering::Relaxed);
-                        1
+                        Ok::<_, BoxCommandError>(1)
                     }
                 }
             }))
@@ -336,7 +336,7 @@ mod tests {
             .command(literal("slow").executes_async({
                 let released = Arc::clone(&released);
                 let completed = Arc::clone(&completed);
-                move |_: &CommandContext<Source<Nothing>>| {
+                move |_: Arc<CommandContext<Source<Nothing>>>| {
                     let released = Arc::clone(&released);
                     let completed = Arc::clone(&completed);
                     async move {
@@ -344,20 +344,20 @@ mod tests {
                             yield_now().await;
                         }
                         completed.fetch_add(1, Ordering::Relaxed);
-                        1
+                        Ok::<_, BoxCommandError>(1)
                     }
                 }
             }))
             .command(literal("fast").executes_async({
                 let released = Arc::clone(&released);
                 let completed = Arc::clone(&completed);
-                move |_: &CommandContext<Source<Nothing>>| {
+                move |_: Arc<CommandContext<Source<Nothing>>>| {
                     let released = Arc::clone(&released);
                     let completed = Arc::clone(&completed);
                     async move {
                         released.store(true, Ordering::Release);
                         completed.fetch_add(1, Ordering::Relaxed);
-                        1
+                        Ok::<_, BoxCommandError>(1)
                     }
                 }
             }))
@@ -379,14 +379,14 @@ mod tests {
 
     #[test]
     fn panics_and_syntax_errors_are_reported() {
+        async fn panic_command(_: Arc<CommandContext<Source<Nothing>>>) -> CommandResult {
+            panic!("test panic");
+        }
+
         let runtime = Builder::new_current_thread().build().unwrap();
         let errors = Arc::new(AtomicUsize::new(0));
         let console = AsyncConsole::builder(runtime.handle().clone())
-            .command(literal("boom").executes_async(
-                |_: &CommandContext<Source<Nothing>>| async move {
-                    panic!("test panic");
-                },
-            ))
+            .command(literal("boom").executes_async(panic_command))
             .on_error({
                 let errors = Arc::clone(&errors);
                 move |_, _| {
@@ -421,12 +421,12 @@ mod tests {
     fn the_synchronous_console_keeps_its_thread_mode_with_the_feature_enabled() {
         let (sender, receiver) = mpsc::channel();
         let console = Console::builder()
-            .command(
-                literal("where").executes(move |_: &CommandContext<Source<Nothing>>| {
+            .command(literal("where").executes(
+                move |_: &CommandContext<Source<Nothing>>| -> CommandResult {
                     sender.send(thread::current().id()).unwrap();
-                    1
-                }),
-            )
+                    Ok(1)
+                },
+            ))
             .build(Nothing { unlocked: true });
 
         crate::dispatch(

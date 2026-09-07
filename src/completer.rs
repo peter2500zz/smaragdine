@@ -264,8 +264,11 @@ mod tests {
         tree.register(
             literal("kick").then(
                 argument("player", word())
-                    .executes(|_| 1)
-                    .then(argument("reason", greedy_string()).executes(|_| 2)),
+                    .executes(|_| -> CommandResult { Ok(1) })
+                    .then(
+                        argument("reason", greedy_string())
+                            .executes(|_| -> CommandResult { Ok(2) }),
+                    ),
             ),
         );
         let source = source();
@@ -280,8 +283,10 @@ mod tests {
     fn optional_literal_is_suggested_after_terminal_space_run() {
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         tree.register(
-            literal("kick")
-                .then(argument("player", word()).then(literal("reason").executes(|_| 2))),
+            literal("kick").then(
+                argument("player", word())
+                    .then(literal("reason").executes(|_| -> CommandResult { Ok(2) })),
+            ),
         );
         let source = source();
 
@@ -303,7 +308,10 @@ mod tests {
     fn longer_commands_sharing_a_prefix_still_appear() {
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         for name in ["echo", "echobig", "exit"] {
-            tree.register(literal(name).executes(|_: &CommandContext<Source<Nothing>>| 1));
+            tree.register(
+                literal(name)
+                    .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
+            );
         }
         let (tree, source) = (Arc::new(tree), source());
 
@@ -395,7 +403,7 @@ mod tests {
         tree.register(
             literal("open")
                 .requires(|s: &Source<Nothing>| s.state().unlocked)
-                .executes(|_: &CommandContext<Source<Nothing>>| 1),
+                .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
         );
         let tree = Arc::new(tree);
 

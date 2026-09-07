@@ -447,13 +447,15 @@ mod tests {
         use azalea_brigadier::prelude::*;
 
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
-        tree.register(literal("add").then(
-            argument("a", integer()).then(
-                argument("b", integer()).then(
-                    argument("c", integer()).executes(|_: &CommandContext<Source<Nothing>>| 1),
+        tree.register(
+            literal("add").then(
+                argument("a", integer()).then(
+                    argument("b", integer()).then(argument("c", integer()).executes(
+                        |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) },
+                    )),
                 ),
             ),
-        ));
+        );
 
         let coloured: Vec<(String, Option<Color>)> =
             styled_line(&tree, &source(), &paint(), "add 1 2 3")
@@ -515,7 +517,7 @@ mod tests {
     fn arguments_before_a_redirect_are_kept() {
         use azalea_brigadier::prelude::*;
 
-        let run = |_: &CommandContext<Source<Nothing>>| 1;
+        let run = |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) };
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         let target = tree.register(literal("target").then(argument("b", integer()).executes(run)));
         tree.register(literal("hop").then(argument("a", integer()).redirect(target)));
@@ -537,7 +539,7 @@ mod tests {
     fn arguments_sharing_a_name_are_both_kept() {
         use azalea_brigadier::prelude::*;
 
-        let run = |_: &CommandContext<Source<Nothing>>| 1;
+        let run = |_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) };
         let mut tree: CommandDispatcher<Source<Nothing>> = CommandDispatcher::new();
         tree.register(
             literal("pair").then(

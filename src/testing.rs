@@ -32,12 +32,14 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
         literal("echo").describe("把参数原样输出").then(
             argument("message", greedy_string())
                 .describe("要输出的内容")
-                .executes(|_: &CommandContext<Source<Nothing>>| 1),
+                .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
         ),
     );
 
     // 刻意不写说明。
-    tree.register(literal("quit").executes(|_: &CommandContext<Source<Nothing>>| 1));
+    tree.register(
+        literal("quit").executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
+    );
 
     tree.register(
         literal("proxy")
@@ -45,12 +47,12 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
             .then(
                 literal("on")
                     .describe("启用上游代理")
-                    .executes(|_: &CommandContext<Source<Nothing>>| 1),
+                    .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
             )
             .then(
                 literal("off")
                     .describe("关闭上游代理，改为直连")
-                    .executes(|_: &CommandContext<Source<Nothing>>| 1),
+                    .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
             ),
     );
 
@@ -61,19 +63,22 @@ pub(crate) fn dispatcher() -> Arc<Tree> {
                 // 与 proxy on 同名，各说各的。
                 literal("on")
                     .describe("打开详细日志")
-                    .executes(|_: &CommandContext<Source<Nothing>>| 1),
+                    .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
             )
-            .then(literal("level").describe("设定级别").then(
-                // 没写说明的参数，说明退回 brigadier 的 examples()。
-                argument("level", integer()).executes(|_: &CommandContext<Source<Nothing>>| 1),
-            )),
+            .then(
+                literal("level").describe("设定级别").then(
+                    // 没写说明的参数，说明退回 brigadier 的 examples()。
+                    argument("level", integer())
+                        .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
+                ),
+            ),
     );
 
     tree.register(
         literal("open")
             .describe("只有解锁时才可用")
             .requires(|s: &Source<Nothing>| s.state().unlocked)
-            .executes(|_: &CommandContext<Source<Nothing>>| 1),
+            .executes(|_: &CommandContext<Source<Nothing>>| -> CommandResult { Ok(1) }),
     );
 
     Arc::new(tree)
