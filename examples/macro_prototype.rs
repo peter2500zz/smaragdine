@@ -6,78 +6,9 @@ use smaragdine::brigadier::{
 use smaragdine::prelude::*;
 use std::sync::Arc;
 
-// These macros intentionally remain private to this executable example.
-// They record the syntax experiment without freezing a public library API.
-#[cfg(feature = "async")]
-macro_rules! async_handler {
-    ($node:expr, $handler:expr) => {
-        ($node).executes_async($handler)
-    };
-}
-
-#[cfg(not(feature = "async"))]
-#[allow(unused_macros)]
-macro_rules! async_handler {
-    ($node:expr, $handler:expr) => {
-        compile_error!("async command registration requires the async feature")
-    };
-}
-
-macro_rules! command {
-    (@handler sync; $node:expr, $handler:expr) => {
-        ($node).executes($handler)
-    };
-    (@handler async; $node:expr, $handler:expr) => {
-        async_handler!($node, $handler)
-    };
-    (@children $mode:ident; $node:expr; $($child:expr => { $($body:tt)* };)*) => {{
-        let node = $node;
-        // Repetition handles siblings; recursion follows tree depth only.
-        $( let node = node.then(command!($mode; $child => { $($body)* })); )*
-        node
-    }};
-    ($mode:ident; $node:expr => { run: $handler:expr; $($children:tt)* }) => {
-        command!(@children $mode;
-            command!(@handler $mode; $node, $handler);
-            $($children)*)
-    };
-    ($mode:ident; $node:expr => { run sync: $handler:expr; $($children:tt)* }) => {
-        command!(@children $mode;
-            command!(@handler sync; $node, $handler);
-            $($children)*)
-    };
-    ($mode:ident; $node:expr => { run async: $handler:expr; $($children:tt)* }) => {
-        command!(@children $mode;
-            command!(@handler async; $node, $handler);
-            $($children)*)
-    };
-    ($mode:ident; $node:expr => { $($children:tt)* }) => {
-        command!(@children $mode; $node; $($children)*)
-    };
-    ($node:expr => { $($body:tt)* }) => {
-        command!(sync; $node => { $($body)* })
-    };
-}
-
-macro_rules! commands {
-    ($dispatcher:ident, { $($body:tt)* }) => {
-        commands!($dispatcher, sync { $($body)* })
-    };
-    ($dispatcher:ident, $mode:ident { $($node:expr => { $($body:tt)* };)* }) => {{
-        // Ordinary method calls preserve two-phase receiver borrowing, so a
-        // node may reference dispatcher.root while it is being registered.
-        $( $dispatcher.register(command!($mode; $node => { $($body)* })); )*
-    }};
-    ($dispatcher:expr, { $($body:tt)* }) => {
-        commands!($dispatcher, sync { $($body)* })
-    };
-    ($dispatcher:expr, $mode:ident { $($body:tt)* }) => {{
-        // A computed dispatcher expression is evaluated once. Its borrow
-        // lasts for this block; precompute any targets borrowed from it.
-        let dispatcher = &mut $dispatcher;
-        commands!(dispatcher, $mode { $($body)* });
-    }};
-}
+#[macro_use]
+#[path = "support/command_macros.rs"]
+mod command_macros;
 
 #[derive(Default)]
 struct PlayerParser {
