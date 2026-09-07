@@ -1,0 +1,16 @@
+error[E0599]: no associated function or constant named `arg` found for struct `Parser` in the current scope
+  --> tests/ui/fail/missing_factory_impl.rs:20:37
+   |
+ 8 | struct Parser;
+   | ------------- associated function or constant `arg` not found for this struct
+...
+20 |     commands!(dispatcher, { Parser::arg("player") => {}; });
+   |                                     ^^^ associated function or constant not found in `Parser`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `arg`, perhaps you need to implement it:
+           candidate #1: `smaragdine::prelude::CommandArgument`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0599`.

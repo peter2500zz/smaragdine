@@ -1,0 +1,71 @@
+error[E0277]: `Parser` is not a command builder
+   --> tests/ui/fail/parser_as_builder.rs:11:29
+    |
+ 11 |     commands!(dispatcher, { support::Parser => { run: support::handler; }; });
+    |                             ^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+   ::: tests/ui/fail/../../../examples/support/command_macros.rs:56:9
+    |
+ 56 |         smaragdine::brigadier::builder::CommandBuilder::executes($node, $handler)
+    |         -------------------------------------------------------- required by a bound introduced by this call
+    |
+help: the trait `smaragdine::prelude::CommandBuilder` is not implemented for `Parser`
+   --> tests/ui/fail/../support.rs:11:1
+    |
+ 11 | pub struct Parser;
+    | ^^^^^^^^^^^^^^^^^
+    = note: If this is a parser, use Parser::arg(name) or parser.into_arg(name) first. A custom builder implements CommandBuilder; parsing alone does not provide builder methods.
+help: the following other types implement trait `smaragdine::prelude::CommandBuilder`
+   --> tests/ui/fail/../support.rs:31:1
+    |
+ 31 | impl<S, R> CommandBuilder for Named<S, R> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `support::Named<S, R>`
+    |
+   ::: $AZALEA_BRIGADIER/src/builder/command_builder.rs:144:1
+    |
+144 | impl<S, R, P: NodeKind<S, R>> CommandBuilder for ArgumentBuilder<S, R, P> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `smaragdine::prelude::ArgumentBuilder<S, R, P>`
+
+error[E0277]: `Parser` cannot be registered as a command node
+   --> tests/ui/fail/../../../examples/support/command_macros.rs:137:33
+    |
+ 73 |         node
+    |         ---- this tail expression is of type `Parser`
+...
+137 |         $( $dispatcher.register(command!(@body $mode; $node; $($body)*)); )*
+    |                        -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |                        |
+    |                        required by a bound introduced by this call
+    |
+   ::: tests/ui/fail/parser_as_builder.rs:11:5
+    |
+ 11 |     commands!(dispatcher, { support::Parser => { run: support::handler; }; });
+    |     ------------------------------------------------------------------------- in this macro invocation
+    |
+help: the trait `smaragdine::prelude::CommandBuilder` is not implemented for `Parser`
+   --> tests/ui/fail/../support.rs:11:1
+    |
+ 11 | pub struct Parser;
+    | ^^^^^^^^^^^^^^^^^
+    = note: Expected a command builder, a built CommandNode, or a wrapper implementing IntoCommandNode with matching source and output types. If this is a parser, use Parser::arg(name) or parser.into_arg(name) first.
+help: the following other types implement trait `smaragdine::prelude::CommandBuilder`
+   --> tests/ui/fail/../support.rs:31:1
+    |
+ 31 | impl<S, R> CommandBuilder for Named<S, R> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `support::Named<S, R>`
+    |
+   ::: $AZALEA_BRIGADIER/src/builder/command_builder.rs:144:1
+    |
+144 | impl<S, R, P: NodeKind<S, R>> CommandBuilder for ArgumentBuilder<S, R, P> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `smaragdine::prelude::ArgumentBuilder<S, R, P>`
+    = note: required for `Parser` to implement `IntoCommandNode<()>`
+note: required by a bound in `smaragdine::prelude::CommandDispatcher::<S, R>::register`
+   --> $AZALEA_BRIGADIER/src/command_dispatcher.rs:66:43
+    |
+ 66 |     pub fn register(&mut self, node: impl IntoCommandNode<S, R>) -> Arc<RwLock<CommandNode<S, R>>> {
+    |                                           ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CommandDispatcher::<S, R>::register`
+    = note: this error originates in the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0277`.

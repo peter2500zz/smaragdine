@@ -1,0 +1,22 @@
+error[E0425]: cannot find function `integre` in this scope
+  --> tests/ui/fail/factory_typo.rs:11:29
+   |
+11 |       commands!(dispatcher, { integre("number") => {}; });
+   |                               ^^^^^^^
+   |
+  ::: $AZALEA_BRIGADIER/src/arguments/integer_argument_type.rs:57:1
+   |
+57 | / pub fn integer<S, R>(
+58 | |     name: impl Into<String>,
+59 | | ) -> crate::builder::argument_builder::ArgumentBuilder<S, R, Integer> {
+   | |_____________________________________________________________________- similarly named function `integer` defined here
+   |
+help: a function with a similar name exists
+   |
+11 -     commands!(dispatcher, { integre("number") => {}; });
+11 +     commands!(dispatcher, { integer("number") => {}; });
+   |
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0425`.

@@ -1,0 +1,14 @@
+error: a node may declare only one `run`; place it before child nodes
+  --> tests/ui/fail/../../../examples/support/command_macros.rs:62:9
+   |
+62 |         compile_error!("a node may declare only one `run`; place it before child nodes")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: tests/ui/fail/duplicate_run.rs:11:5
+   |
+11 |     commands!(dispatcher, { literal("hello") => { run: support::handler; run: support::handler; }; });
+   |     ------------------------------------------------------------------------------------------------- in this macro invocation
+   |
+   = note: this error originates in the macro `command` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 1 previous error

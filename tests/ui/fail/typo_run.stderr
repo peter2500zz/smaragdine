@@ -1,0 +1,14 @@
+error: unknown node entry `runs:`; use `run: handler;` to attach a handler
+   --> tests/ui/fail/../../../examples/support/command_macros.rs:108:9
+    |
+108 |         compile_error!(concat!("unknown node entry `", stringify!($unknown), ":`; use `run: handler;` to attach a handler"))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: tests/ui/fail/typo_run.rs:11:5
+    |
+ 11 |     commands!(dispatcher, { literal("hello") => { runs: support::handler; }; });
+    |     --------------------------------------------------------------------------- in this macro invocation
+    |
+    = note: this error originates in the macro `command` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 1 previous error

@@ -50,6 +50,14 @@ parking_lot = "0.12"
 # runtime；因此核心只开 `rt`，计时器、网络、多线程调度器都由使用方按需启用。
 tokio = { version = "1", optional = true, default-features = false, features = ["rt"] }
 
+[dev-dependencies]
+# Compile-fail diagnostics and downstream-style macro examples only.
+ui_test = { version = "0.30", default-features = false, features = ["rustc"] }
+
+[[test]]
+name = "ui"
+harness = false
+
 [[example]]
 name = "async_demo"
 required-features = ["async-demo"]

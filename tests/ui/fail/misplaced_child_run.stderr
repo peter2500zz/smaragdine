@@ -1,0 +1,19 @@
+error: invalid child node; expected `node => { ... };`: use `=>` and end every node with `;` (not `,`); put `run: handler;` before children
+  --> tests/ui/fail/../../../examples/support/command_macros.rs:76:9
+   |
+76 |   ...   compile_error!("invalid child node; expected `node => { ... };`: use `=>` and end every node with `;` (not `,`); put `run: handler;` before children")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: tests/ui/fail/misplaced_child_run.rs:11:5
+   |
+11 | /     commands!(dispatcher, {
+12 | |         literal("parent") => {
+13 | |             literal("child") => {};
+14 | |             run: support::handler;
+15 | |         };
+16 | |     });
+   | |______- in this macro invocation
+   |
+   = note: this error originates in the macro `command` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 1 previous error

@@ -1,0 +1,14 @@
+error: missing handler after `run:`; expected `run: handler;`
+  --> tests/ui/fail/../../../examples/support/command_macros.rs:79:9
+   |
+79 |         compile_error!("missing handler after `run:`; expected `run: handler;`")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: tests/ui/fail/missing_handler.rs:11:5
+   |
+11 |     commands!(dispatcher, { literal("hello") => { run: ; }; });
+   |     ---------------------------------------------------------- in this macro invocation
+   |
+   = note: this error originates in the macro `command` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 1 previous error

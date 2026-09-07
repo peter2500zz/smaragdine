@@ -1,0 +1,45 @@
+error[E0277]: the trait bound `Builder<S, R>: From<smaragdine::prelude::ArgumentBuilder<S, R, Parser>>` is not satisfied
+   --> tests/ui/fail/missing_custom_builder_traits.rs:19:26
+    |
+ 19 |     type Builder<S, R> = Builder<S, R>;
+    |                          ^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `From<smaragdine::prelude::ArgumentBuilder<S, R, Parser>>` is not implemented for `Builder<S, R>`
+   --> tests/ui/fail/missing_custom_builder_traits.rs:17:1
+    |
+ 17 | struct Builder<S, R>(ArgumentBuilder<S, R, Parser>);
+    | ^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `smaragdine::prelude::CommandArgument::Builder`
+   --> $AZALEA_BRIGADIER/src/builder/command_argument.rs:150:11
+    |
+149 |     type Builder<S, R>: CommandBuilder<Source = S, Output = R, Kind = Self>
+    |          ------- required by a bound in this associated type
+150 |         + From<ArgumentBuilder<S, R, Self>>;
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CommandArgument::Builder`
+
+error[E0277]: `Builder<S, R>` is not a command builder
+   --> tests/ui/fail/missing_custom_builder_traits.rs:19:26
+    |
+ 19 |     type Builder<S, R> = Builder<S, R>;
+    |                          ^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `CommandBuilder` is not implemented for `Builder<S, R>`
+   --> tests/ui/fail/missing_custom_builder_traits.rs:17:1
+    |
+ 17 | struct Builder<S, R>(ArgumentBuilder<S, R, Parser>);
+    | ^^^^^^^^^^^^^^^^^^^^
+    = note: If this is a parser, use Parser::arg(name) or parser.into_arg(name) first. A custom builder implements CommandBuilder; parsing alone does not provide builder methods.
+help: the trait `CommandBuilder` is implemented for `smaragdine::prelude::ArgumentBuilder<S, R, P>`
+   --> $AZALEA_BRIGADIER/src/builder/command_builder.rs:144:1
+    |
+144 | impl<S, R, P: NodeKind<S, R>> CommandBuilder for ArgumentBuilder<S, R, P> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `smaragdine::prelude::CommandArgument::Builder`
+   --> $AZALEA_BRIGADIER/src/builder/command_argument.rs:149:25
+    |
+149 |     type Builder<S, R>: CommandBuilder<Source = S, Output = R, Kind = Self>
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CommandArgument::Builder`
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0277`.

@@ -1,0 +1,18 @@
+error[E0277]: the trait bound `StringArgument: std::default::Default` is not satisfied
+   --> tests/ui/fail/missing_default.rs:11:29
+    |
+ 11 |     commands!(dispatcher, { smaragdine::brigadier::parsers::StringArgument::arg("text") => {}; });
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::default::Default` is not implemented for `StringArgument`
+    |
+note: required by a bound in `arg`
+   --> $AZALEA_BRIGADIER/src/builder/command_argument.rs:158:15
+    |
+156 |     fn arg<S, R>(name: impl Into<String>) -> Self::Builder<S, R>
+    |        --- required by a bound in this associated function
+157 |     where
+158 |         Self: Default,
+    |               ^^^^^^^ required by this bound in `CommandArgument::arg`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.

@@ -1,0 +1,18 @@
+[package]
+name = "command-ui-dependencies"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[workspace]
+
+[lib]
+path = "lib.rs"
+
+[features]
+async = ["smaragdine/async"]
+
+[dependencies]
+# Keep the fork revision in this crate's lockfile aligned with the root lockfile.
+smaragdine = { path = "../../.." }

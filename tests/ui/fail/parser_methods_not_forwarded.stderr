@@ -1,0 +1,9 @@
+error[E0599]: no method named `online_only` found for struct `smaragdine::prelude::ArgumentBuilder<S, R, P>` in the current scope
+  --> tests/ui/fail/parser_methods_not_forwarded.rs:31:51
+   |
+31 |     commands!(dispatcher, { Parser::arg("player").online_only() => {}; });
+   |                                                   ^^^^^^^^^^^ method not found in `smaragdine::prelude::ArgumentBuilder<_, _, Parser>`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0599`.
