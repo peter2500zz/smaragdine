@@ -43,18 +43,102 @@ fn main() {
     // 创建 smaragdine 控制台
     let console = Console::builder()
         // 以 Minecraft 风格注册命令
-        .command(
-            literal("ping").executes(|ctx: &CommandContext<Source<App>>| -> CommandResult {
-                ctx.source.printer().print("pong!");
-                Ok(1)
-            }),
-        )
+        .command(literal("ping").executes(ping))
         .build(App::default());
 
     // 运行控制台
     console.run();
 
     println!("Bye!");
+}
+
+fn ping(ctx: &CommandContext<Source<App>>) -> CommandResult {
+    ctx.source.printer().print("pong!");
+    Ok(1)
+}
+```
+
+启用 `async` 特性将允许使用基于异步运行时的控制台以避免使用过多 OS 线程：
+
+```rust
+use std::sync::Arc;
+
+use smaragdine::{AsyncConsole, Source, brigadier::prelude::*};
+
+/// 程序状态
+#[derive(Default)]
+struct App {}
+
+#[tokio::main]
+async fn main() {
+    // 获取 tokio 运行时
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_time()
+        .build()
+        .expect("build Tokio runtime");
+
+    // 创建异步的 smaragdine 控制台
+    let console = AsyncConsole::builder(runtime.handle().clone())
+        // 以 Minecraft 风格注册命令
+        .command(literal("ping").executes_async(ping))
+        .build(App::default());
+
+    // 运行控制台
+    console.run();
+
+    println!("Bye!");
+}
+
+/// 示例异步函数
+async fn ping(ctx: Arc<CommandContext<Source<App>>>) -> CommandResult {
+    ctx.source.printer().print("pong!");
+    Ok(1)
+}
+```
+
+启用 `macros` 特性将允许使用简易的宏语法构建命令：
+
+```rust
+use smaragdine::{Console, Source, brigadier::prelude::*, commands};
+
+/// 程序状态
+#[derive(Default)]
+struct App {}
+
+fn main() {
+    // 创建 smaragdine 控制台
+    let console = Console::builder()
+        // 以 Minecraft 风格注册命令
+        .commands(register_my_commands)
+        .build(App::default());
+
+    // 运行控制台
+    console.run();
+
+    println!("Bye!");
+}
+
+/// 使用宏注册命令
+fn register_my_commands(d: &mut CommandDispatcher<Source<App>>) {
+    commands!(d, {
+        // ping
+        literal("ping") => { run: ping; };
+        // foo
+        literal("foo") => {
+            run: ping;
+            // foo 123
+            integer("bar") => { run: ping; };
+            // foo true
+            boolean("boom") => { run: ping; };
+            // foo bar
+            literal("bar") => { run: ping; };
+        };
+    })
+}
+
+fn ping(ctx: &CommandContext<Source<App>>) -> CommandResult {
+    ctx.source.printer().print("pong!");
+    Ok(1)
 }
 ```
 
