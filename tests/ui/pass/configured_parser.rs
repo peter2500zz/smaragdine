@@ -1,9 +1,7 @@
 //@edition: 2024
 //@run
 #![allow(unused_imports, dead_code)]
-#[macro_use]
-#[path = "../../../examples/support/command_macros.rs"]
-mod command_macros;
+use smaragdine::{commands};
 use smaragdine::brigadier::parsers::StringArgument;
 use smaragdine::prelude::*;
 fn main() {

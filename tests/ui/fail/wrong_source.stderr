@@ -1,31 +1,23 @@
 error[E0271]: type mismatch resolving `<Named<String, i32> as CommandBuilder>::Source == ()`
-   --> tests/ui/fail/../../../examples/support/command_macros.rs:137:33
-    |
- 73 |         node
-    |         ---- this tail expression is of type `Named<String, i32>`
-...
-137 |         $( $dispatcher.register(command!(@body $mode; $node; $($body)*)); )*
-    |                        -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch resolving `<Named<String, i32> as CommandBuilder>::Source == ()`
-    |                        |
-    |                        required by a bound introduced by this call
-    |
-   ::: tests/ui/fail/wrong_source.rs:12:5
-    |
- 12 |     commands!(dispatcher, { node => {}; });
-    |     -------------------------------------- in this macro invocation
-    |
+  --> tests/ui/fail/wrong_source.rs:10:29
+   |
+10 |     commands!(dispatcher, { node => {}; });
+   |     ------------------------^^^^----------
+   |     |                       |
+   |     |                       type mismatch resolving `<Named<String, i32> as CommandBuilder>::Source == ()`
+   |     required by a bound introduced by this call
+   |
 note: expected this to be `()`
-   --> tests/ui/fail/../support.rs:32:19
-    |
- 32 |     type Source = S;
-    |                   ^
-    = note: required for `support::Named<String, i32>` to implement `IntoCommandNode<()>`
+  --> tests/ui/fail/../support.rs:32:19
+   |
+32 |     type Source = S;
+   |                   ^
+   = note: required for `support::Named<String, i32>` to implement `IntoCommandNode<()>`
 note: required by a bound in `smaragdine::prelude::CommandDispatcher::<S, R>::register`
-   --> $AZALEA_BRIGADIER/src/command_dispatcher.rs:66:43
-    |
- 66 |     pub fn register(&mut self, node: impl IntoCommandNode<S, R>) -> Arc<RwLock<CommandNode<S, R>>> {
-    |                                           ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CommandDispatcher::<S, R>::register`
-    = note: this error originates in the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+  --> $AZALEA_BRIGADIER/src/command_dispatcher.rs:66:43
+   |
+66 |     pub fn register(&mut self, node: impl IntoCommandNode<S, R>) -> Arc<RwLock<CommandNode<S, R>>> {
+   |                                           ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CommandDispatcher::<S, R>::register`
 
 error: aborting due to 1 previous error
 

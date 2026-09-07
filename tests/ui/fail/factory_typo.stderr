@@ -1,7 +1,7 @@
 error[E0425]: cannot find function `integre` in this scope
-  --> tests/ui/fail/factory_typo.rs:11:29
+  --> tests/ui/fail/factory_typo.rs:9:29
    |
-11 |       commands!(dispatcher, { integre("number") => {}; });
+ 9 |       commands!(dispatcher, { integre("number") => {}; });
    |                               ^^^^^^^
    |
   ::: $AZALEA_BRIGADIER/src/arguments/integer_argument_type.rs:57:1
@@ -13,8 +13,8 @@ error[E0425]: cannot find function `integre` in this scope
    |
 help: a function with a similar name exists
    |
-11 -     commands!(dispatcher, { integre("number") => {}; });
-11 +     commands!(dispatcher, { integer("number") => {}; });
+ 9 -     commands!(dispatcher, { integre("number") => {}; });
+ 9 +     commands!(dispatcher, { integer("number") => {}; });
    |
 
 error: aborting due to 1 previous error

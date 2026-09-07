@@ -1,8 +1,6 @@
 //@edition: 2024
 //@run
-#[macro_use]
-#[path = "../../../examples/support/command_macros.rs"]
-mod command_macros;
+use smaragdine::{commands};
 use smaragdine::prelude::*;
 
 fn main() {

@@ -1,20 +1,13 @@
 error: async command registration requires the async feature; enable smaragdine's `async` feature or use sync registration
-  --> tests/ui/sync_fail/../../../examples/support/command_macros.rs:40:9
-   |
-40 | ...   compile_error!("async command registration requires the async feature; enable smaragdine's `async` feature or use sync registration")
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-  ::: tests/ui/sync_fail/async_subtree.rs:8:13
-   |
- 8 |     let _ = command!(async; literal::<(), i32>("parent") => {});
-   |             --------------------------------------------------- in this macro invocation
-   |
-   = note: this error originates in the macro `command_async` which comes from the expansion of the macro `command` (in Nightly builds, run with -Z macro-backtrace for more info)
+ --> tests/ui/sync_fail/async_subtree.rs:6:22
+  |
+6 |     let _ = command!(async; literal::<(), i32>("parent") => {});
+  |                      ^^^^^
 
 warning: unused import: `smaragdine::prelude::*`
- --> tests/ui/sync_fail/async_subtree.rs:5:5
+ --> tests/ui/sync_fail/async_subtree.rs:3:5
   |
-5 | use smaragdine::prelude::*;
+3 | use smaragdine::prelude::*;
   |     ^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

@@ -1,14 +1,7 @@
 error: unknown command mode `asnyc`; expected `sync` or `async`
-  --> tests/ui/fail/../../../examples/support/command_macros.rs:50:9
-   |
-50 |         compile_error!(concat!("unknown command mode `", stringify!($mode), "`; expected `sync` or `async`"))
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-  ::: tests/ui/fail/unknown_mode_override.rs:11:5
-   |
-11 |     commands!(dispatcher, asnyc { literal("hello") => { run sync: support::handler; }; });
-   |     ------------------------------------------------------------------------------------- in this macro invocation
-   |
-   = note: this error originates in the macro `command_mode` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+ --> tests/ui/fail/unknown_mode_override.rs:9:27
+  |
+9 |     commands!(dispatcher, asnyc { literal("hello") => { run sync: support::handler; }; });
+  |                           ^^^^^
 
 error: aborting due to 1 previous error

@@ -865,8 +865,18 @@ dependencies = [
  "nu-ansi-term",
  "parking_lot",
  "reedline",
+ "smaragdine-macros",
  "tokio",
  "ui_test",
+]
+
+[[package]]
+name = "smaragdine-macros"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]

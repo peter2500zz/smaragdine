@@ -1,14 +1,7 @@
-error: missing `;` after command handler; expected `run: handler;`
-  --> tests/ui/fail/../../../examples/support/command_macros.rs:93:9
-   |
-93 |         compile_error!("missing `;` after command handler; expected `run: handler;`")
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-  ::: tests/ui/fail/missing_run_semicolon.rs:11:5
-   |
-11 |     commands!(dispatcher, { literal("hello") => { run: support::handler }; });
-   |     ------------------------------------------------------------------------- in this macro invocation
-   |
-   = note: this error originates in the macro `command` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+error: unexpected end of input, missing `;` after handler; use `;`, not `,`
+ --> tests/ui/fail/missing_run_semicolon.rs:9:73
+  |
+9 |     commands!(dispatcher, { literal("hello") => { run: support::handler }; });
+  |                                                                         ^
 
 error: aborting due to 1 previous error

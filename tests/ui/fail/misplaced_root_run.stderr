@@ -1,14 +1,7 @@
 error: `run` belongs inside a node body; expected `node => { run: handler; };`
-   --> tests/ui/fail/../../../examples/support/command_macros.rs:129:9
-    |
-129 |         compile_error!("`run` belongs inside a node body; expected `node => { run: handler; };`")
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-   ::: tests/ui/fail/misplaced_root_run.rs:11:5
-    |
- 11 |     commands!(dispatcher, { run: support::handler; });
-    |     ------------------------------------------------- in this macro invocation
-    |
-    = note: this error originates in the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+ --> tests/ui/fail/misplaced_root_run.rs:9:29
+  |
+9 |     commands!(dispatcher, { run: support::handler; });
+  |                             ^^^
 
 error: aborting due to 1 previous error

@@ -1,8 +1,6 @@
 //@edition: 2024
 #![allow(unused_imports, dead_code)]
-#[macro_use]
-#[path = "../../../examples/support/command_macros.rs"]
-mod command_macros;
+use smaragdine::{commands};
 #[path = "../support.rs"]
 mod support;
 use smaragdine::prelude::{CommandArgument, CommandDispatcher};

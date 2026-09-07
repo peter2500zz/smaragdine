@@ -1,14 +1,14 @@
 error[E0599]: no method named `rnage` found for struct `smaragdine::prelude::ArgumentBuilder<S, R, P>` in the current scope
-  --> tests/ui/fail/builtin_method_typo.rs:11:47
-   |
-11 |     commands!(dispatcher, { integer("number").rnage(1..=10) => {}; });
-   |                                               ^^^^^
-   |
+ --> tests/ui/fail/builtin_method_typo.rs:9:47
+  |
+9 |     commands!(dispatcher, { integer("number").rnage(1..=10) => {}; });
+  |                                               ^^^^^
+  |
 help: there is a method `range` with a similar name
-   |
-11 -     commands!(dispatcher, { integer("number").rnage(1..=10) => {}; });
-11 +     commands!(dispatcher, { integer("number").range(1..=10) => {}; });
-   |
+  |
+9 -     commands!(dispatcher, { integer("number").rnage(1..=10) => {}; });
+9 +     commands!(dispatcher, { integer("number").range(1..=10) => {}; });
+  |
 
 error: aborting due to 1 previous error
 

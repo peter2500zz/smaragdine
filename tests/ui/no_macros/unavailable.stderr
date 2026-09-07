@@ -1,0 +1,11 @@
+error[E0432]: unresolved imports `smaragdine::command`, `smaragdine::commands`
+ --> tests/ui/no_macros/unavailable.rs:2:18
+  |
+2 | use smaragdine::{command, commands};
+  |                  ^^^^^^^  ^^^^^^^^ no `commands` in the root
+  |                  |
+  |                  no `command` in the root
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0432`.

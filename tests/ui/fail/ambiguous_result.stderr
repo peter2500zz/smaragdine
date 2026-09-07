@@ -1,13 +1,13 @@
 error[E0282]: type annotations needed
-  --> tests/ui/fail/ambiguous_result.rs:11:60
-   |
-11 |     commands!(dispatcher, { literal("hello") => { run: |_| Ok(1); }; });
-   |                                                            ^^ cannot infer type of the type parameter `E` declared on the enum `Result`
-   |
+ --> tests/ui/fail/ambiguous_result.rs:9:60
+  |
+9 |     commands!(dispatcher, { literal("hello") => { run: |_| Ok(1); }; });
+  |                                                            ^^ cannot infer type of the type parameter `E` declared on the enum `Result`
+  |
 help: consider specifying the generic arguments
-   |
-11 |     commands!(dispatcher, { literal("hello") => { run: |_| Ok::<i32, E>(1); }; });
-   |                                                              ++++++++++
+  |
+9 |     commands!(dispatcher, { literal("hello") => { run: |_| Ok::<i32, E>(1); }; });
+  |                                                              ++++++++++
 
 error: aborting due to 1 previous error
 

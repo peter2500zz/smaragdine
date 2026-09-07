@@ -1,9 +1,7 @@
 //@edition: 2024
 //@run
 #![allow(dead_code)]
-#[macro_use]
-#[path = "../../../examples/support/command_macros.rs"]
-mod command_macros;
+use smaragdine::{commands};
 use smaragdine::brigadier::{
     arguments::{ArgumentType, ParsedValue},
     string_reader::StringReader,

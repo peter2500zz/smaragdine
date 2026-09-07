@@ -1,18 +1,11 @@
 error[E0277]: `Parser` cannot be registered as a command node
-   --> tests/ui/fail/../../../examples/support/command_macros.rs:137:33
+   --> tests/ui/fail/parser_as_node.rs:9:29
     |
- 73 |         node
-    |         ---- this tail expression is of type `Parser`
-...
-137 |         $( $dispatcher.register(command!(@body $mode; $node; $($body)*)); )*
-    |                        -------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
-    |                        |
-    |                        required by a bound introduced by this call
-    |
-   ::: tests/ui/fail/parser_as_node.rs:11:5
-    |
- 11 |     commands!(dispatcher, { support::Parser => {}; });
-    |     ------------------------------------------------- in this macro invocation
+  9 |     commands!(dispatcher, { support::Parser => {}; });
+    |     ------------------------^^^^^^^------------------
+    |     |                       |
+    |     |                       unsatisfied trait bound
+    |     required by a bound introduced by this call
     |
 help: the trait `smaragdine::prelude::CommandBuilder` is not implemented for `Parser`
    --> tests/ui/fail/../support.rs:11:1
@@ -36,7 +29,6 @@ note: required by a bound in `smaragdine::prelude::CommandDispatcher::<S, R>::re
     |
  66 |     pub fn register(&mut self, node: impl IntoCommandNode<S, R>) -> Arc<RwLock<CommandNode<S, R>>> {
     |                                           ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CommandDispatcher::<S, R>::register`
-    = note: this error originates in the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: aborting due to 1 previous error
 

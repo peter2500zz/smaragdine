@@ -1,14 +1,7 @@
 error: async command registration requires the async feature; enable smaragdine's `async` feature or use sync registration
-  --> tests/ui/sync_fail/../../../examples/support/command_macros.rs:40:9
-   |
-40 | ...   compile_error!("async command registration requires the async feature; enable smaragdine's `async` feature or use sync registration")
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-  ::: tests/ui/sync_fail/async_mode_override.rs:11:5
-   |
-11 |     commands!(dispatcher, async { literal("hello") => { run sync: support::handler; }; });
-   |     ------------------------------------------------------------------------------------- in this macro invocation
-   |
-   = note: this error originates in the macro `command_async` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+ --> tests/ui/sync_fail/async_mode_override.rs:9:27
+  |
+9 |     commands!(dispatcher, async { literal("hello") => { run sync: support::handler; }; });
+  |                           ^^^^^
 
 error: aborting due to 1 previous error

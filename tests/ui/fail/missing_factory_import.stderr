@@ -1,7 +1,7 @@
 error[E0599]: no associated function or constant named `arg` found for struct `Parser` in the current scope
-  --> tests/ui/fail/missing_factory_import.rs:11:46
+  --> tests/ui/fail/missing_factory_import.rs:9:46
    |
-11 |     commands!(dispatcher, { support::Parser::arg("player") => {}; });
+ 9 |     commands!(dispatcher, { support::Parser::arg("player") => {}; });
    |                                              ^^^ associated function or constant not found in `Parser`
    |
   ::: tests/ui/fail/../support.rs:11:1

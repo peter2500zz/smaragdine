@@ -1,7 +1,5 @@
 //@edition: 2024
-#[macro_use]
-#[path = "../../../examples/support/command_macros.rs"]
-mod command_macros;
+use smaragdine::{commands};
 #[path = "../support.rs"]
 mod support;
 use smaragdine::prelude::*;

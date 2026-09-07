@@ -1,12 +1,12 @@
 error[E0046]: not all trait items implemented, missing: `as_builder`, `map_builder`, `into_builder`
-  --> tests/ui/fail/incomplete_builder.rs:10:1
-   |
-10 | impl CommandBuilder for Builder {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `as_builder`, `map_builder`, `into_builder` in implementation
-   |
-   = help: implement the missing item: `fn as_builder(&self) -> &smaragdine::prelude::ArgumentBuilder<<Self as smaragdine::prelude::CommandBuilder>::Source, <Self as smaragdine::prelude::CommandBuilder>::Output, <Self as smaragdine::prelude::CommandBuilder>::Kind> { todo!() }`
-   = help: implement the missing item: `fn map_builder(self, _: impl FnOnce(ArgumentBuilder<Self::Source, Self::Output, Self::Kind>) -> ArgumentBuilder<Self::Source, Self::Output, Self::Kind>) -> Self { todo!() }`
-   = help: implement the missing item: `fn into_builder(self) -> smaragdine::prelude::ArgumentBuilder<<Self as smaragdine::prelude::CommandBuilder>::Source, <Self as smaragdine::prelude::CommandBuilder>::Output, <Self as smaragdine::prelude::CommandBuilder>::Kind> { todo!() }`
+ --> tests/ui/fail/incomplete_builder.rs:8:1
+  |
+8 | impl CommandBuilder for Builder {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `as_builder`, `map_builder`, `into_builder` in implementation
+  |
+  = help: implement the missing item: `fn as_builder(&self) -> &smaragdine::prelude::ArgumentBuilder<<Self as smaragdine::prelude::CommandBuilder>::Source, <Self as smaragdine::prelude::CommandBuilder>::Output, <Self as smaragdine::prelude::CommandBuilder>::Kind> { todo!() }`
+  = help: implement the missing item: `fn map_builder(self, _: impl FnOnce(ArgumentBuilder<Self::Source, Self::Output, Self::Kind>) -> ArgumentBuilder<Self::Source, Self::Output, Self::Kind>) -> Self { todo!() }`
+  = help: implement the missing item: `fn into_builder(self) -> smaragdine::prelude::ArgumentBuilder<<Self as smaragdine::prelude::CommandBuilder>::Source, <Self as smaragdine::prelude::CommandBuilder>::Output, <Self as smaragdine::prelude::CommandBuilder>::Kind> { todo!() }`
 
 error: aborting due to 1 previous error
 

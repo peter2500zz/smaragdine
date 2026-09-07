@@ -1,7 +1,7 @@
 error[E0277]: the trait bound `StringArgument: std::default::Default` is not satisfied
-   --> tests/ui/fail/missing_default.rs:11:29
+   --> tests/ui/fail/missing_default.rs:9:29
     |
- 11 |     commands!(dispatcher, { smaragdine::brigadier::parsers::StringArgument::arg("text") => {}; });
+  9 |     commands!(dispatcher, { smaragdine::brigadier::parsers::StringArgument::arg("text") => {}; });
     |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::default::Default` is not implemented for `StringArgument`
     |
 note: required by a bound in `arg`

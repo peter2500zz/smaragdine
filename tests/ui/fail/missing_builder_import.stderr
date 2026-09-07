@@ -1,7 +1,7 @@
 error[E0599]: no method named `describe` found for struct `support::Named<S, R>` in the current scope
-  --> tests/ui/fail/missing_builder_import.rs:11:60
+  --> tests/ui/fail/missing_builder_import.rs:9:60
    |
-11 |     commands!(dispatcher, { support::Parser::arg("player").describe("Target") => {}; });
+ 9 |     commands!(dispatcher, { support::Parser::arg("player").describe("Target") => {}; });
    |                                                            ^^^^^^^^ method not found in `support::Named<_, _>`
    |
   ::: $AZALEA_BRIGADIER/src/builder/command_builder.rs:85:8

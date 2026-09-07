@@ -6,10 +6,6 @@ use smaragdine::brigadier::{
 use smaragdine::prelude::*;
 use std::sync::Arc;
 
-#[macro_use]
-#[path = "support/command_macros.rs"]
-mod command_macros;
-
 #[derive(Default)]
 struct PlayerParser {
     online_only: bool,

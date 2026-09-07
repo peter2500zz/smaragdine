@@ -1,14 +1,7 @@
-error: invalid command node; expected `command!(node => { run: handler; })`
-   --> tests/ui/fail/../../../examples/support/command_macros.rs:117:9
-    |
-117 |         compile_error!("invalid command node; expected `command!(node => { run: handler; })`")
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-   ::: tests/ui/fail/standalone_wrong_arrow.rs:11:13
-    |
- 11 |     let _ = command!(literal::<(), i32>("hello") -> {});
-    |             ------------------------------------------- in this macro invocation
-    |
-    = note: this error originates in the macro `command` (in Nightly builds, run with -Z macro-backtrace for more info)
+error: invalid node expression; expected `node => { ... }`: expected an expression
+ --> tests/ui/fail/standalone_wrong_arrow.rs:9:51
+  |
+9 |     let _ = command!(literal::<(), i32>("hello") -> {});
+  |                                                   ^
 
 error: aborting due to 1 previous error

@@ -1,13 +1,13 @@
 error[E0277]: `Parser` does not implement command argument parsing
-   --> tests/ui/fail/missing_parsing_impl.rs:10:26
+   --> tests/ui/fail/missing_parsing_impl.rs:8:26
     |
- 10 |     type Builder<S, R> = ArgumentBuilder<S, R, Self>;
+  8 |     type Builder<S, R> = ArgumentBuilder<S, R, Self>;
     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
     |
 help: the trait `ArgumentType` is not implemented for `Parser`
-   --> tests/ui/fail/missing_parsing_impl.rs:8:1
+   --> tests/ui/fail/missing_parsing_impl.rs:6:1
     |
-  8 | struct Parser;
+  6 | struct Parser;
     | ^^^^^^^^^^^^^
     = note: Implement ArgumentType::parse for the parser. CommandArgument selects a named builder; it does not replace the parsing implementation.
     = help: the following other types implement trait `ArgumentType`:
@@ -26,15 +26,15 @@ note: required by a bound in `smaragdine::prelude::CommandArgument::Builder`
     |                                                                ^^^^^^^^^^^ required by this bound in `CommandArgument::Builder`
 
 error[E0277]: `Parser` does not implement command argument parsing
-   --> tests/ui/fail/missing_parsing_impl.rs:9:26
+   --> tests/ui/fail/missing_parsing_impl.rs:7:26
     |
-  9 | impl CommandArgument for Parser {
+  7 | impl CommandArgument for Parser {
     |                          ^^^^^^ unsatisfied trait bound
     |
 help: the trait `ArgumentType` is not implemented for `Parser`
-   --> tests/ui/fail/missing_parsing_impl.rs:8:1
+   --> tests/ui/fail/missing_parsing_impl.rs:6:1
     |
-  8 | struct Parser;
+  6 | struct Parser;
     | ^^^^^^^^^^^^^
     = note: Implement ArgumentType::parse for the parser. CommandArgument selects a named builder; it does not replace the parsing implementation.
     = help: the following other types implement trait `ArgumentType`:

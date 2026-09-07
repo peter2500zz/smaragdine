@@ -1,7 +1,7 @@
 error[E0599]: no method named `teleport` found for struct `support::Named<S, R>` in the current scope
-  --> tests/ui/fail/nonexistent_method.rs:11:60
+  --> tests/ui/fail/nonexistent_method.rs:9:60
    |
-11 |     commands!(dispatcher, { support::Parser::arg("player").teleport() => {}; });
+ 9 |     commands!(dispatcher, { support::Parser::arg("player").teleport() => {}; });
    |                                                            ^^^^^^^^ method not found in `support::Named<_, _>`
    |
   ::: tests/ui/fail/../support.rs:23:1

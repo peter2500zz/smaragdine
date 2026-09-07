@@ -1,13 +1,13 @@
 error[E0599]: no method named `desribe` found for struct `smaragdine::prelude::ArgumentBuilder<S, R, P>` in the current scope
-  --> tests/ui/fail/common_method_typo.rs:11:46
-   |
-11 |     commands!(dispatcher, { literal("hello").desribe("Hello") => {}; });
-   |                                              ^^^^^^^
-   |
+ --> tests/ui/fail/common_method_typo.rs:9:46
+  |
+9 |     commands!(dispatcher, { literal("hello").desribe("Hello") => {}; });
+  |                                              ^^^^^^^
+  |
 help: there is a method `describe` with a similar name
-   |
-11 |     commands!(dispatcher, { literal("hello").describe("Hello") => {}; });
-   |                                                 +
+  |
+9 |     commands!(dispatcher, { literal("hello").describe("Hello") => {}; });
+  |                                                 +
 
 error: aborting due to 1 previous error
 

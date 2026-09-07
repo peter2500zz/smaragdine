@@ -8,14 +8,23 @@ license = "Apache-2.0"
 readme = false
 publish = false
 
+[workspace]
+members = ["smaragdine-macros"]
+default-members = ["."]
+resolver = "3"
+
 [features]
 default = []
-async = ["dep:tokio", "azalea-brigadier/async"]
+macros = ["dep:smaragdine-macros"]
+async = ["dep:tokio", "azalea-brigadier/async", "smaragdine-macros?/async"]
 # 只给仓库内示例补齐 runtime 驱动；普通 `async` 用户不被迫带计时器或
 # 多线程调度器，按自己的应用选择 Tokio feature。
 async-demo = ["async", "tokio/rt-multi-thread", "tokio/time"]
 
 [dependencies]
+# Command DSL parsing runs on the host, only when explicitly enabled.
+smaragdine-macros = { path = "smaragdine-macros", optional = true }
+
 # ── 指令树 ──
 # 用 fork 而非 crates.io，两处改动都非它不可：
 # * 上游的 StringReader 把字符数当字节偏移用，任何非 ASCII 输入都会 panic
@@ -57,6 +66,11 @@ ui_test = { version = "0.30", default-features = false, features = ["rustc"] }
 [[test]]
 name = "ui"
 harness = false
+required-features = ["macros"]
+
+[[example]]
+name = "macro_prototype"
+required-features = ["macros"]
 
 [[example]]
 name = "async_demo"

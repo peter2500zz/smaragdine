@@ -71,6 +71,8 @@ mod keys;
 mod menu;
 mod printer;
 mod prompt;
+#[cfg(feature = "macros")]
+mod registration;
 mod source;
 #[cfg(test)]
 mod testing;
@@ -99,6 +101,9 @@ pub use theme::{Paint, Piece, Token, default_paint};
 pub use azalea_brigadier as brigadier;
 pub use nu_ansi_term;
 pub use reedline;
+#[cfg(feature = "macros")]
+#[doc(hidden)]
+pub use smaragdine_macros::{command as __command, commands as __commands};
 #[cfg(feature = "async")]
 pub use tokio;
 
@@ -109,6 +114,8 @@ pub mod prelude {
     pub use crate::{
         Console, ConsoleBuilder, Exit, Help, Paint, Piece, Printer, Source, Text, Token, Usage,
     };
+    #[cfg(feature = "macros")]
+    pub use crate::{command, commands};
     pub use azalea_brigadier::prelude::*;
 }
 

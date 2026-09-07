@@ -1,13 +1,11 @@
 error[E0271]: expected `wrong` to return `Result<i32, _>`, but it returns `i32`
-  --> tests/ui/fail/wrong_handler_return.rs:14:56
+  --> tests/ui/fail/wrong_handler_return.rs:12:56
    |
-14 |     commands!(dispatcher, { literal("hello") => { run: wrong; }; });
-   |                                                        ^^^^^ expected `Result<i32, _>`, found `i32`
-   |
-  ::: tests/ui/fail/../../../examples/support/command_macros.rs:56:9
-   |
-56 |         smaragdine::brigadier::builder::CommandBuilder::executes($node, $handler)
-   |         -------------------------------------------------------- required by a bound introduced by this call
+12 |     commands!(dispatcher, { literal("hello") => { run: wrong; }; });
+   |     ---------------------------------------------------^^^^^-------
+   |     |                                                  |
+   |     |                                                  expected `Result<i32, _>`, found `i32`
+   |     required by a bound introduced by this call
    |
    = note: expected enum `Result<i32, _>`
               found type `i32`

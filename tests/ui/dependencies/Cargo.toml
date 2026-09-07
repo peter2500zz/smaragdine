@@ -11,6 +11,7 @@ publish = false
 path = "lib.rs"
 
 [features]
+macros = ["smaragdine/macros"]
 async = ["smaragdine/async"]
 
 [dependencies]

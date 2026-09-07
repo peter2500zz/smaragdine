@@ -1,14 +1,7 @@
-error: invalid handler declaration; expected `run: handler;`, `run sync: handler;`, or `run async: handler;`
-   --> tests/ui/fail/../../../examples/support/command_macros.rs:102:9
-    |
-102 |         compile_error!("invalid handler declaration; expected `run: handler;`, `run sync: handler;`, or `run async: handler;`")
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-   ::: tests/ui/fail/invalid_run_syntax.rs:11:5
-    |
- 11 |     commands!(dispatcher, { literal("hello") => { run = support::handler; }; });
-    |     --------------------------------------------------------------------------- in this macro invocation
-    |
-    = note: this error originates in the macro `command` which comes from the expansion of the macro `commands` (in Nightly builds, run with -Z macro-backtrace for more info)
+error: expected `run: handler;`, `run sync: handler;`, or `run async: handler;`
+ --> tests/ui/fail/invalid_run_syntax.rs:9:55
+  |
+9 |     commands!(dispatcher, { literal("hello") => { run = support::handler; }; });
+  |                                                       ^
 
 error: aborting due to 1 previous error

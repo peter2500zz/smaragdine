@@ -1,0 +1,23 @@
+[package]
+name = "smaragdine-macros"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Optional compile-time command registration for smaragdine"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+proc-macro = true
+
+[features]
+default = []
+async = []
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "3", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }
+
+[lints.rust]
+unsafe_code = "forbid"
