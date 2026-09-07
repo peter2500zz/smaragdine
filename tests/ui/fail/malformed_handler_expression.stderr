@@ -1,0 +1,7 @@
+error: invalid handler expression: expected an expression
+ --> tests/ui/fail/malformed_handler_expression.rs:5:61
+  |
+5 |     let _ = command!(literal::<(), i32>("bad") => { run: if ; });
+  |                                                             ^
+
+error: aborting due to 1 previous error

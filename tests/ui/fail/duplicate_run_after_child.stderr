@@ -1,0 +1,7 @@
+error: duplicate `run`; a node may have only one handler
+  --> tests/ui/fail/duplicate_run_after_child.rs:10:9
+   |
+10 |         run sync: handler;
+   |         ^^^
+
+error: aborting due to 1 previous error
